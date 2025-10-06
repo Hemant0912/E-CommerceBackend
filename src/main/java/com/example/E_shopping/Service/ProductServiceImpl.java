@@ -61,23 +61,31 @@ public class ProductServiceImpl implements ProductService {
                 .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
-    // ✅ Update Product
     @Override
     public ProductResponseDTO updateProduct(Long id, ProductRequestDTO dto) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-        product.setName(dto.getName());
-        product.setDescription(dto.getDescription());
-        product.setType(dto.getType());
-        product.setCategory(dto.getCategory());
-        product.setColor(dto.getColor());
-        product.setPrice(dto.getPrice());
-        product.setQuantity(dto.getQuantity());
+        // Update only non-null fields
+        if (dto.getName() != null) product.setName(dto.getName());
+        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
+        if (dto.getType() != null) product.setType(dto.getType());
+        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
+        if (dto.getColor() != null) product.setColor(dto.getColor());
+        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
+
+        // ✅ Handle stock field correctly
+        if (dto.getQuantity() != null) {
+            product.setQuantity(dto.getQuantity());
+        } else if (dto.getStock() != null) { // if quantity is null but stock is provided
+            product.setQuantity(dto.getStock());
+        }
 
         Product updated = productRepository.save(product);
         return mapToDTO(updated);
     }
+
+
 
     // ✅ Delete Product
     @Override

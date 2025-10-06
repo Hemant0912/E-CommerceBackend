@@ -5,11 +5,14 @@ import lombok.Data;
 @Data
 public class ProductRequestDTO {
     private String name;
-    private String type;        // e.g., phone, shirt
-    private String category;    // ✅ e.g., electronics, clothing
+    private String type;
+    private String category;
     private String description;
     private String color;
-    private double price;
-    private int quantity;
+    private Double price;
+    private Integer quantity; // legacy field
+    private Integer stock;    // new field for updates
     private Long merchantId;
 }
+
+
