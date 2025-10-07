@@ -18,11 +18,8 @@ public interface AuthService {
 
     String generateAndSaveToken(User user);
 
-     // ✅ Add this
-
     boolean validatePassword(String rawPassword, String encodedPassword);
 
-    // ---------- Merchant ----------
     MerchantResponseDTO registerMerchant(MerchantRequestDTO dto);
 
     AuthResponseDTO loginMerchant(AuthRequestDTO dto);
@@ -39,5 +36,4 @@ public interface AuthService {
 
     String generateToken(Merchant merchant);
 
-    // ✅ Add this
 }

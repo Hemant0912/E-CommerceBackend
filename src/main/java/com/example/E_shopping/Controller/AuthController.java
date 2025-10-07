@@ -14,7 +14,7 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    // --------- USER LOGIN ---------
+    // user login
     @PostMapping("/user/login")
     public ResponseEntity<UserResponseDTO> loginUser(@Valid @RequestBody AuthRequestDTO dto) {
         AuthResponseDTO auth = authService.loginUser(dto);
@@ -29,7 +29,7 @@ public class AuthController {
         response.setAddress(auth.getAddress());
 
         return ResponseEntity.ok()
-                .header("X-Auth", auth.getToken()) // ✅ Token only in header
+                .header("X-Auth", auth.getToken()) // jwt in x-auth in header
                 .body(response);
     }
 

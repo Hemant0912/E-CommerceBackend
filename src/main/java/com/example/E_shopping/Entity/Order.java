@@ -1,30 +1,31 @@
 package com.example.E_shopping.Entity;
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.persistence.Id;
-
+import java.util.List;
 
 @Entity
-@Table(name = "cart_items")
+@Table(name = "orders")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CartItem {
+public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @OneToMany
+    private List<CartItem> items;
 
-    @Column(nullable = false)
-    private int quantity;
+    private double totalPrice;
+
+    private String status; // order status mtlb pending delivered etc
+
+    private String paymentId;
 }

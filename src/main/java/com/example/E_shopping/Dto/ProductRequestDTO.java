@@ -10,8 +10,8 @@ public class ProductRequestDTO {
     private String description;
     private String color;
     private Double price;
-    private Integer quantity; // legacy field
-    private Integer stock;    // new field for updates
+    private Integer quantity;
+    private Integer stock;
     private Long merchantId;
 }
 

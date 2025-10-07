@@ -3,8 +3,7 @@ package com.example.E_shopping.Dto;
 import lombok.Data;
 
 @Data
-public class CartItemRequestDTO {
+public class IndividualOrderRequestDTO {
     private Long productId;
-    private Integer quantity; // quantity for adding
+    private int quantity;
 }
-

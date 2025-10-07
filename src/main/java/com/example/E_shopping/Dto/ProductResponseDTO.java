@@ -7,7 +7,7 @@ public class ProductResponseDTO {
     private Long id;
     private String name;
     private String type;
-    private String category; // ✅ new
+    private String category;
     private String color;
     private double price;
     private int quantity;

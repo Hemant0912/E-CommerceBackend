@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MerchantResponseDTO {
-    private String id;      // already String
+    private String id;     
     private String name;
     private String email;
     private String mobile;

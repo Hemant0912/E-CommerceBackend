@@ -29,13 +29,13 @@ public class User {
     private String password;
 
     @Column(nullable = false, length = 50)
-    private String role; // USER or ADMIN
+    private String role;
 
     @Column(length = 255)
     private String address;
 
     @Column(length = 500)
-    private String latestToken;  // for JWT management
+    private String latestToken;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)

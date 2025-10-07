@@ -82,8 +82,12 @@
             <artifactId>activation</artifactId>
             <version>1.1.1</version>
         </dependency>
-
-
+        <!-- Temporal-->
+        <dependency>
+            <groupId>io.temporal</groupId>
+            <artifactId>temporal-sdk</artifactId>
+            <version>1.23.2</version>
+        </dependency>
 
     </dependencies>
 

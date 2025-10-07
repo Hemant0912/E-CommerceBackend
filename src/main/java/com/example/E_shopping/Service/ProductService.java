@@ -14,7 +14,6 @@ public interface ProductService {
     Page<ProductResponseDTO> getAllProducts(Pageable pageable);
     List<ProductResponseDTO> listProducts(String token);
 
-    // ✅ Search methods
     List<ProductResponseDTO> searchByCategory(String category);
     List<ProductResponseDTO> searchByType(String type);
     List<ProductResponseDTO> searchByKeyword(String keyword);

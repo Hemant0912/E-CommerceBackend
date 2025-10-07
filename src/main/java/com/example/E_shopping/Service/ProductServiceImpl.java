@@ -1,5 +1,6 @@
 package com.example.E_shopping.Service;
-
+import com.example.E_shopping.Entity.CartItem;
+import com.example.E_shopping.Repository.CartItemRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.example.E_shopping.Dto.ProductRequestDTO;
 import com.example.E_shopping.Dto.ProductResponseDTO;
@@ -28,7 +29,10 @@ public class ProductServiceImpl implements ProductService {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // ✅ Add Product (Merchant only)
+    @Autowired
+    private CartItemRepository cartItemRepository;
+
+    // add product merchant
     @Override
     public ProductResponseDTO addProduct(ProductRequestDTO dto) {
         String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -40,17 +44,27 @@ public class ProductServiceImpl implements ProductService {
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setType(dto.getType());
-        product.setCategory(dto.getCategory()); // ✅ FIXED - category now saved
+        product.setCategory(dto.getCategory());
         product.setColor(dto.getColor());
         product.setPrice(dto.getPrice());
-        product.setQuantity(dto.getQuantity());
+
+        // for quantity handling
+        if (dto.getQuantity() != null) {
+            product.setQuantity(dto.getQuantity());
+        } else if (dto.getStock() != null) {
+            product.setQuantity(dto.getStock());
+        } else {
+            product.setQuantity(0); // default if nothing provided
+        }
+
         product.setMerchant(merchant);
 
         Product saved = productRepository.save(product);
         return mapToDTO(saved);
     }
 
-    // ✅ Merchant can view their listed products
+
+    // merchant can view the product
     @Override
     public List<ProductResponseDTO> listProducts(String token) {
         String email = jwtUtil.getEmailFromToken(token);
@@ -74,7 +88,6 @@ public class ProductServiceImpl implements ProductService {
         if (dto.getColor() != null) product.setColor(dto.getColor());
         if (dto.getPrice() != null) product.setPrice(dto.getPrice());
 
-        // ✅ Handle stock field correctly
         if (dto.getQuantity() != null) {
             product.setQuantity(dto.getQuantity());
         } else if (dto.getStock() != null) { // if quantity is null but stock is provided
@@ -87,13 +100,23 @@ public class ProductServiceImpl implements ProductService {
 
 
 
-    // ✅ Delete Product
+    // delete product
     @Override
     public void deleteProduct(Long id) {
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+        // Delete only cart items related to this product
+        List<CartItem> relatedCartItems = cartItemRepository.findByProduct(product);
+        if (!relatedCartItems.isEmpty()) {
+            cartItemRepository.deleteAll(relatedCartItems);
+        }
+
+        // Now delete the product
+        productRepository.delete(product);
     }
 
-    // ✅ Get product by ID
+    // get product by id
     @Override
     public ProductResponseDTO getProductById(Long id) {
         Product product = productRepository.findById(id)
@@ -101,34 +124,33 @@ public class ProductServiceImpl implements ProductService {
         return mapToDTO(product);
     }
 
-    // ✅ Get all products (Paginated)
+    // get all product
     @Override
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable).map(this::mapToDTO);
     }
 
-    // ✅ Search by Category
+    // search by category
     @Override
     public List<ProductResponseDTO> searchByCategory(String category) {
         return productRepository.findByCategoryIgnoreCase(category)
                 .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
-    // ✅ Search by Type
+    // search by its type
     @Override
     public List<ProductResponseDTO> searchByType(String type) {
         return productRepository.findByTypeIgnoreCase(type)
                 .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
-    // ✅ Search by Keyword (name)
+    // search by name
     @Override
     public List<ProductResponseDTO> searchByKeyword(String keyword) {
         return productRepository.findByNameContainingIgnoreCase(keyword)
                 .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
-    // ✅ Mapper Method
     private ProductResponseDTO mapToDTO(Product product) {
         ProductResponseDTO dto = new ProductResponseDTO();
         dto.setId(product.getId());

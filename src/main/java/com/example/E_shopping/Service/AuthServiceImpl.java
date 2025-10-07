@@ -74,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
         response.setEmail(user.getEmail());
         response.setMobile(user.getMobile());
         response.setRole(user.getRole());
-        response.setAddress(user.getAddress()); // ✅ FIXED: address will now appear
+        response.setAddress(user.getAddress());
         response.setCartItemCount(0);
         response.setToken(token);
 
@@ -117,7 +117,6 @@ public class AuthServiceImpl implements AuthService {
         return token;
     }
 
-    // -------------------- MERCHANT --------------------
     @Override
     public MerchantResponseDTO registerMerchant(MerchantRequestDTO dto) {
         if (merchantRepository.findByEmail(dto.getEmail()).isPresent())

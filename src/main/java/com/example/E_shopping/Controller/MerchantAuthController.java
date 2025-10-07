@@ -15,14 +15,14 @@ public class MerchantAuthController {
     @Autowired
     private MerchantService merchantService;
 
-    // Signup
+    // merchant signup
     @PostMapping("/signup")
     public ResponseEntity<MerchantResponseDTO> signup(@Valid @RequestBody MerchantRequestDTO dto) {
         MerchantResponseDTO response = merchantService.registerMerchant(dto);
         return ResponseEntity.ok(response);
     }
 
-    // Login
+    // merchant login
     @PostMapping("/login")
     public ResponseEntity<MerchantResponseDTO> login(@Valid @RequestBody MerchantLoginDTO dto) {
         Merchant merchant = merchantService.getMerchantByEmailOrMobile(dto.getEmailOrMobile());
@@ -45,7 +45,7 @@ public class MerchantAuthController {
                 .body(response);
     }
 
-    // Logout
+    // merchant logout
     @PostMapping("/logout")
     public ResponseEntity<String> logout(@RequestHeader("X-Auth") String token) {
         merchantService.logoutMerchant(token);

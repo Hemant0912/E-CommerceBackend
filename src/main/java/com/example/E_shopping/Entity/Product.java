@@ -21,10 +21,10 @@ public class Product {
     private String description;
 
     @Column(nullable = false, length = 100)
-    private String type; // e.g., Phone, Laptop, Shirt
+    private String type; // like phone, laptop, etc
 
     @Column(nullable = false, length = 100)
-    private String category; // ✅ e.g., Electronics, Clothing
+    private String category; // electronics like eg
 
     @Column(nullable = false, length = 100)
     private String color;

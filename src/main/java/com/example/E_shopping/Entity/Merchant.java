@@ -27,5 +27,5 @@ public class Merchant {
     private String password;
 
     @Column(length = 500)
-    private String latestToken;  // for JWT management
+    private String latestToken;
 }

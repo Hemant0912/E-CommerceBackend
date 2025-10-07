@@ -19,7 +19,7 @@ public class MerchantService {
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    // ✅ Signup
+    // signup
     public MerchantResponseDTO registerMerchant(MerchantRequestDTO dto) {
         if (merchantRepository.findByEmail(dto.getEmail()).isPresent())
             throw new IllegalArgumentException("Email already exists");
@@ -35,7 +35,7 @@ public class MerchantService {
         Merchant saved = merchantRepository.save(merchant);
 
         return new MerchantResponseDTO(
-                String.valueOf(saved.getId()), // ✅ pass ID
+                String.valueOf(saved.getId()),
                 saved.getName(),
                 saved.getEmail(),
                 saved.getMobile(),
@@ -43,7 +43,7 @@ public class MerchantService {
         );
     }
 
-    // ✅ Login
+    //login
     public MerchantResponseDTO loginMerchant(MerchantLoginDTO dto) {
         Merchant merchant = getMerchantByEmailOrMobile(dto.getEmailOrMobile());
         if (!validatePassword(dto.getPassword(), merchant.getPassword()))
@@ -52,7 +52,7 @@ public class MerchantService {
         String token = generateAndSaveMerchantToken(merchant);
 
         return new MerchantResponseDTO(
-                String.valueOf(merchant.getId()), // ✅ pass ID
+                String.valueOf(merchant.getId()),
                 merchant.getName(),
                 merchant.getEmail(),
                 merchant.getMobile(),

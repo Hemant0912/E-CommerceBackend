@@ -10,8 +10,6 @@ import java.util.List;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByMerchant(Merchant merchant);
-
-    // ✅ New search filters
     List<Product> findByCategoryIgnoreCase(String category);
     List<Product> findByTypeIgnoreCase(String type);
     List<Product> findByNameContainingIgnoreCase(String keyword);

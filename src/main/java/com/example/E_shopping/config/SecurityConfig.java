@@ -20,15 +20,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ Public APIs (signup/login allowed for both user/merchant)
+                        // public api signup/login allowed for both user and merchant
                         .requestMatchers("/public/**",
                                 "/merchant/signup", "/merchant/login",
                                 "/user/signup", "/user/login").permitAll()
-                        // ✅ Everything else needs authentication
                         .anyRequest().authenticated()
                 );
 
-        // ✅ Add JWT filter to check X-auth before processing requests
+        // add jwt filter to check X-auth before processing requests
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
