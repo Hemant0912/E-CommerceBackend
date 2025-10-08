@@ -1,5 +1,6 @@
 package com.example.E_shopping.Controller;
 
+import com.example.E_shopping.Dto.IndividualOrderRequestDTO;
 import com.example.E_shopping.Dto.OrderResponseDTO;
 import com.example.E_shopping.Service.OrderService;
 import com.example.E_shopping.Temporal.OrderWorkflow;
@@ -64,5 +65,14 @@ public class OrderController {
         WorkflowClient.start(() -> workflow.processOrder(orderId, totalPrice, userId));
         return "Order is being processed. You will be notified once payment and delivery are done.";
     }
+    @PostMapping("/order-single")
+    public ResponseEntity<OrderResponseDTO> orderSingleItem(
+            @RequestHeader("X-Auth") String token,
+            @RequestBody IndividualOrderRequestDTO dto) {
+
+        OrderResponseDTO responseDTO = orderService.orderSingleItem(token, dto);
+        return ResponseEntity.ok(responseDTO);
+    }
+
 }
 

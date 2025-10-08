@@ -1,6 +1,6 @@
 package com.example.E_shopping.config;
 
-import com.example.E_shopping.Service.DeliveryWorkFlowImpl;
+import com.example.E_shopping.Temporal.OrderWorkflowImpl;
 import io.temporal.client.WorkflowClient;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
@@ -30,7 +30,7 @@ public class TemporalService {
 
         WorkerFactory factory = WorkerFactory.newInstance(client);
         Worker worker = factory.newWorker("DeliveryTaskQueue");
-        worker.registerWorkflowImplementationTypes(DeliveryWorkFlowImpl.class);
+        worker.registerWorkflowImplementationTypes(OrderWorkflowImpl.class);
         factory.start();
 
         System.out.println("Temporal started on DeliveryTaskQueue");

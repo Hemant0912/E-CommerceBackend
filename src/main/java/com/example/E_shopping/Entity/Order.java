@@ -1,9 +1,10 @@
 package com.example.E_shopping.Entity;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.persistence.Id;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -20,12 +21,25 @@ public class Order {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @OneToMany
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "order_id")
     private List<CartItem> items;
 
     private double totalPrice;
 
-    private String status; // order status mtlb pending delivered etc
+    private String status; // PENDING, PAID, PREPARING, OUT_FOR_DELIVERY, DELIVERED, ...
 
     private String paymentId;
+
+    // Estimated delivery date/time (for UI)
+    private LocalDateTime estimatedDeliveryDate;
+
+    // timestamps for stages
+    private LocalDateTime paidAt;
+    private LocalDateTime preparingAt;
+    private LocalDateTime outForDeliveryAt;
+    private LocalDateTime deliveredAt;
+
+    private LocalDateTime orderDate;
+
 }
