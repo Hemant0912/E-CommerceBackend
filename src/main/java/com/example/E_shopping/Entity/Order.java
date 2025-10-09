@@ -7,18 +7,21 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Entity
 @Table(name = "orders")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
 public class Order {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id; // internal DB id
+
+    @Column(unique = true, nullable = false)
+    private String orderId; // ✅ custom readable Order ID like ORD-20251009-HK3D2
 
     @ManyToOne
-    @JoinColumn(name = "user_id")
     private User user;
 
     @OneToMany(cascade = CascadeType.ALL)
@@ -26,20 +29,13 @@ public class Order {
     private List<CartItem> items;
 
     private double totalPrice;
-
-    private String status; // PENDING, PAID, PREPARING, OUT_FOR_DELIVERY, DELIVERED, ...
-
+    private String status;
     private String paymentId;
 
-    // Estimated delivery date/time (for UI)
-    private LocalDateTime estimatedDeliveryDate;
-
-    // timestamps for stages
+    private LocalDateTime orderDate;
     private LocalDateTime paidAt;
+    private LocalDateTime estimatedDeliveryDate;
     private LocalDateTime preparingAt;
     private LocalDateTime outForDeliveryAt;
     private LocalDateTime deliveredAt;
-
-    private LocalDateTime orderDate;
-
 }

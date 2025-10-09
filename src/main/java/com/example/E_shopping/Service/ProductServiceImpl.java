@@ -40,6 +40,11 @@ public class ProductServiceImpl implements ProductService {
         Merchant merchant = merchantRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
 
+        // ✅ Check if product already exists for this merchant (case-insensitive)
+        if (productRepository.existsByMerchantAndNameIgnoreCase(merchant, dto.getName())) {
+            throw new IllegalArgumentException("Product with the same name already exists for this merchant");
+        }
+
         Product product = new Product();
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
@@ -62,6 +67,7 @@ public class ProductServiceImpl implements ProductService {
         Product saved = productRepository.save(product);
         return mapToDTO(saved);
     }
+
 
 
     // merchant can view the product
@@ -131,9 +137,27 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // search by category
+    // Inside ProductServiceImpl.java
     @Override
     public List<ProductResponseDTO> searchByCategory(String category) {
         return productRepository.findByCategoryIgnoreCase(category)
+                .stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    // ✅ New method for color filtering
+    public List<ProductResponseDTO> searchByColor(String color) {
+        return productRepository.findByColorIgnoreCase(color)
+                .stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    // ✅ New method for combined filter
+    public List<ProductResponseDTO> searchByCategoryAndColor(String category, String color) {
+        return productRepository.findByCategoryIgnoreCaseAndColorIgnoreCase(category, color)
+                .stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    public List<ProductResponseDTO> searchByTypeAndColor(String type, String color) {
+        return productRepository.findByTypeIgnoreCaseAndColorIgnoreCase(type, color)
                 .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 

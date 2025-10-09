@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data
 public class OrderResponseDTO {
-    private Long orderId;
+    private String orderId;
     private List<OrderItemDTO> items;
     private Double totalAmount;
     private String status;
@@ -19,6 +19,6 @@ public class OrderResponseDTO {
     private LocalDateTime outForDeliveryAt;
     private LocalDateTime deliveredAt;
 
-    public void setOrderDate(LocalDateTime orderDate) {
-    }
+    // IMPORTANT: real field for order date
+    private LocalDateTime orderDate;
 }

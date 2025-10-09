@@ -20,14 +20,14 @@ public class ProductController {
     @Autowired
     private ProductService productService;
 
-    // merchant add product
+    // ✅ Merchant add product
     @PreAuthorize("hasRole('MERCHANT') or hasAuthority('PERMISSION_ADD_PRODUCT')")
     @PostMapping("/add")
     public ResponseEntity<ProductResponseDTO> addProduct(@RequestBody ProductRequestDTO dto) {
         return ResponseEntity.ok(productService.addProduct(dto));
     }
 
-    //  merchant update product
+    // ✅ Merchant update product
     @PreAuthorize("hasRole('MERCHANT') or hasAuthority('PERMISSION_UPDATE_PRODUCT')")
     @PutMapping("/update/{id}")
     public ResponseEntity<ProductResponseDTO> updateProduct(@PathVariable Long id,
@@ -35,7 +35,7 @@ public class ProductController {
         return ResponseEntity.ok(productService.updateProduct(id, dto));
     }
 
-    //  merchant delete product
+    // ✅ Merchant delete product
     @PreAuthorize("hasRole('MERCHANT') or hasAuthority('PERMISSION_DELETE_PRODUCT')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteProduct(@PathVariable Long id) {
@@ -43,14 +43,14 @@ public class ProductController {
         return ResponseEntity.ok("Product deleted successfully");
     }
 
-    //  user can view product by ID
+    // ✅ User can view product by ID
     @PreAuthorize("hasRole('USER') or hasAuthority('PERMISSION_VIEW_PRODUCT')")
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponseDTO> getProduct(@PathVariable Long id) {
         return ResponseEntity.ok(productService.getProductById(id));
     }
 
-    //  user can view all products
+    // ✅ User can view all products
     @PreAuthorize("hasRole('USER') or hasAuthority('PERMISSION_VIEW_PRODUCT')")
     @GetMapping("/all")
     public ResponseEntity<Page<ProductResponseDTO>> getAllProducts(
@@ -61,28 +61,35 @@ public class ProductController {
         return ResponseEntity.ok(productService.getAllProducts(pageable));
     }
 
-    //  merchant sees only his own products
+    // ✅ Merchant sees only his own products
     @PreAuthorize("hasRole('MERCHANT')")
     @GetMapping("/merchant")
     public ResponseEntity<List<ProductResponseDTO>> listMerchantProducts(@RequestHeader("X-auth") String token) {
         return ResponseEntity.ok(productService.listProducts(token));
     }
-    //  search products by category
+
+    // ✅ Single unified search endpoint
     @PreAuthorize("hasAuthority('PERMISSION_VIEW_PRODUCT')")
     @GetMapping("/search")
     public ResponseEntity<?> searchProducts(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String color
     ) {
-        if (category != null)
+        if (category != null && color != null)
+            return ResponseEntity.ok(productService.searchByCategoryAndColor(category, color));
+        else if (type != null && color != null)
+            return ResponseEntity.ok(productService.searchByTypeAndColor(type, color));
+        else if (category != null)
             return ResponseEntity.ok(productService.searchByCategory(category));
         else if (type != null)
             return ResponseEntity.ok(productService.searchByType(type));
+        else if (color != null)
+            return ResponseEntity.ok(productService.searchByColor(color));
         else if (keyword != null)
             return ResponseEntity.ok(productService.searchByKeyword(keyword));
         else
-            return ResponseEntity.badRequest().body("Please provide category, type, or keyword to search");
+            return ResponseEntity.badRequest().body("Please provide category, type, color, or keyword to search");
     }
-
 }
