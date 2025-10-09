@@ -31,7 +31,6 @@ public class Order {
     private double totalPrice;
     private String status;
     private String paymentId;
-
     private LocalDateTime orderDate;
     private LocalDateTime paidAt;
     private LocalDateTime estimatedDeliveryDate;

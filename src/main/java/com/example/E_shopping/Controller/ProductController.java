@@ -78,5 +78,4 @@ public class ProductController {
         List<ProductResponseDTO> results = productService.searchProducts(category, type, color, keyword);
         return ResponseEntity.ok(results);
     }
-
 }

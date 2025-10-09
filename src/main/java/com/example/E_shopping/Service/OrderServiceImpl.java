@@ -167,14 +167,20 @@ public class OrderServiceImpl implements OrderService {
         if (product.getQuantity() < dto.getQuantity())
             throw new RuntimeException("Insufficient stock for product: " + product.getName());
 
+        // Deduct stock
         product.setQuantity(product.getQuantity() - dto.getQuantity());
         productRepository.save(product);
 
-        CartItem cartItem = new CartItem(null, user, product, dto.getQuantity());
+        // ✅ Create CartItem properly linked to user & product
+        CartItem cartItem = new CartItem();
+        cartItem.setProduct(product);
+        cartItem.setQuantity(dto.getQuantity());
+        cartItem.setUser(user);
 
+        // ✅ Create and link order
         Order order = new Order();
         order.setUser(user);
-        order.setItems(List.of(cartItem));
+        order.setItems(List.of(cartItem)); // link the single item
         order.setTotalPrice(product.getPrice() * dto.getQuantity());
         order.setOrderId(OrderIdGenerator.generateOrderId());
         order.setStatus("PAID");
@@ -183,9 +189,10 @@ public class OrderServiceImpl implements OrderService {
         order.setPaidAt(LocalDateTime.now());
         order.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(4));
 
+        // ✅ Save order (will cascade CartItem)
         Order savedOrder = orderRepository.save(order);
 
-        // Temporal workflow
+        // ✅ Start Temporal workflow after commit
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -195,7 +202,8 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
                 WorkflowClient.start(() ->
-                        workflow.processOrder(savedOrder.getId().toString(),
+                        workflow.processOrder(
+                                savedOrder.getId().toString(),
                                 savedOrder.getTotalPrice(),
                                 user.getId().toString()));
             }
@@ -203,6 +211,7 @@ public class OrderServiceImpl implements OrderService {
 
         return mapToDTO(savedOrder);
     }
+
 
     @Override @Transactional
     public void cancelOrder(String token, Long orderId) {
