@@ -1,5 +1,4 @@
 package com.example.E_shopping.Controller;
-
 import com.example.E_shopping.Dto.ProductRequestDTO;
 import com.example.E_shopping.Dto.ProductResponseDTO;
 import com.example.E_shopping.Service.ProductService;
@@ -10,7 +9,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -69,27 +67,16 @@ public class ProductController {
     }
 
     // ✅ Single unified search endpoint
-    @PreAuthorize("hasAuthority('PERMISSION_VIEW_PRODUCT')")
     @GetMapping("/search")
-    public ResponseEntity<?> searchProducts(
+    @PreAuthorize("hasAuthority('PERMISSION_VIEW_PRODUCT')")
+    public ResponseEntity<List<ProductResponseDTO>> searchProducts(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String color
+            @RequestParam(required = false) String color,
+            @RequestParam(required = false) String keyword
     ) {
-        if (category != null && color != null)
-            return ResponseEntity.ok(productService.searchByCategoryAndColor(category, color));
-        else if (type != null && color != null)
-            return ResponseEntity.ok(productService.searchByTypeAndColor(type, color));
-        else if (category != null)
-            return ResponseEntity.ok(productService.searchByCategory(category));
-        else if (type != null)
-            return ResponseEntity.ok(productService.searchByType(type));
-        else if (color != null)
-            return ResponseEntity.ok(productService.searchByColor(color));
-        else if (keyword != null)
-            return ResponseEntity.ok(productService.searchByKeyword(keyword));
-        else
-            return ResponseEntity.badRequest().body("Please provide category, type, color, or keyword to search");
+        List<ProductResponseDTO> results = productService.searchProducts(category, type, color, keyword);
+        return ResponseEntity.ok(results);
     }
+
 }

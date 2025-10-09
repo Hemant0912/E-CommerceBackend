@@ -13,12 +13,5 @@ public interface ProductService {
     ProductResponseDTO getProductById(Long id);
     Page<ProductResponseDTO> getAllProducts(Pageable pageable);
     List<ProductResponseDTO> listProducts(String token);
-
-    List<ProductResponseDTO> searchByCategory(String category);
-    List<ProductResponseDTO> searchByType(String type);
-    List<ProductResponseDTO> searchByKeyword(String keyword);
-
-    List<ProductResponseDTO> searchByColor(String color);
-    List<ProductResponseDTO> searchByCategoryAndColor(String category, String color);
-    List<ProductResponseDTO> searchByTypeAndColor(String type, String color);
+    List<ProductResponseDTO> searchProducts(String category, String type, String color, String keyword);
 }
