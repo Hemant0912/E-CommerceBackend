@@ -11,5 +11,7 @@ public interface OrderActivities {
     void updateOrderStatusWithTimestamp(Long orderId, String status, LocalDateTime timestamp);
 
     void setEstimatedDeliveryDate(Long orderId, LocalDateTime estimatedDate);
+
+    void processRefund(Long orderId);
 }
 

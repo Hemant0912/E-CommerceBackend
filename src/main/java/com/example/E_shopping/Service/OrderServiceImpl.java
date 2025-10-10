@@ -1,11 +1,12 @@
 package com.example.E_shopping.Service;
+
 import com.example.E_shopping.Dto.*;
 import com.example.E_shopping.Entity.*;
-import com.example.E_shopping.util.OrderIdGenerator;
 import com.example.E_shopping.Repository.*;
 import com.example.E_shopping.Temporal.OrderWorkflow;
 import com.example.E_shopping.config.TemporalService;
 import com.example.E_shopping.util.JwtUtil;
+import com.example.E_shopping.util.OrderIdGenerator;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,46 +29,38 @@ public class OrderServiceImpl implements OrderService {
     @Autowired private JwtUtil jwtUtil;
     @Autowired private TemporalService temporalService;
 
+    // ✅ Create a new order from cart
     @Override
     @Transactional
     public OrderResponseDTO createOrder(String token) {
         User user = getUserFromToken(token);
 
-        // 1️⃣ Fetch all cart items
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
         if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
 
-        // 2️⃣ Merge duplicates in memory
         Map<Long, Integer> productQuantities = new HashMap<>();
         for (CartItem item : cartItems) {
             productQuantities.merge(item.getProduct().getId(), item.getQuantity(), Integer::sum);
         }
 
+        double totalPrice = 0;
         List<CartItem> finalItems = new ArrayList<>();
 
-        double totalPrice = 0;
-
-        // 3️⃣ Deduct stock and prepare final list
         for (Map.Entry<Long, Integer> entry : productQuantities.entrySet()) {
-            Long productId = entry.getKey();
+            Product product = productRepository.findById(entry.getKey())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
             int quantity = entry.getValue();
 
-            Product product = productRepository.findById(productId)
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
-
-            if (product.getQuantity() < quantity) {
+            if (product.getQuantity() < quantity)
                 throw new RuntimeException("Insufficient stock for " + product.getName());
-            }
 
             product.setQuantity(product.getQuantity() - quantity);
             productRepository.save(product);
 
-            CartItem item = new CartItem(null, user, product, quantity);
-            finalItems.add(item);
+            finalItems.add(new CartItem(null, user, product, quantity));
             totalPrice += product.getPrice() * quantity;
         }
 
-        // 4️⃣ Create new order
         Order order = new Order();
         order.setUser(user);
         order.setItems(finalItems);
@@ -79,11 +73,8 @@ public class OrderServiceImpl implements OrderService {
         order.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(4));
 
         Order savedOrder = orderRepository.save(order);
-
-        // 5️⃣ Clear user's cart completely
         cartItemRepository.deleteAll(cartItems);
 
-        // 6️⃣ Start Temporal workflow
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -93,26 +84,21 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
                 WorkflowClient.start(() ->
-                        workflow.processOrder(
-                                savedOrder.getId().toString(),
+                        workflow.processOrder(savedOrder.getOrderId(),
                                 savedOrder.getTotalPrice(),
                                 user.getId().toString()));
             }
         });
 
-        // 7️⃣ Return order with correct orderId & payment info
         return mapToDTO(savedOrder);
     }
 
-
-
-
-    // ✅ payOrder implementation
+    // ✅ Pay for existing order
     @Override
     @Transactional
-    public OrderResponseDTO payOrder(String token, Long orderId) {
+    public OrderResponseDTO payOrder(String token, String orderId) {
         User user = getUserFromToken(token);
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         if (!order.getUser().equals(user))
@@ -120,7 +106,6 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus().equals("PAID") || order.getStatus().equals("DELIVERED"))
             throw new RuntimeException("Order already paid or delivered");
 
-        // Deduct stock
         for (CartItem item : order.getItems()) {
             Product product = productRepository.findById(item.getProduct().getId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -135,10 +120,8 @@ public class OrderServiceImpl implements OrderService {
         order.setPaymentId(OrderIdGenerator.generatePaymentId());
         orderRepository.save(order);
 
-        // Clear cart items
         cartItemRepository.deleteAll(order.getItems());
 
-        // Temporal workflow
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -148,7 +131,7 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
                 WorkflowClient.start(() ->
-                        workflow.processOrder(order.getId().toString(),
+                        workflow.processOrder(order.getOrderId(),
                                 order.getTotalPrice(),
                                 user.getId().toString()));
             }
@@ -157,6 +140,7 @@ public class OrderServiceImpl implements OrderService {
         return mapToDTO(order);
     }
 
+    // ✅ Order single product
     @Override
     @Transactional
     public OrderResponseDTO orderSingleItem(String token, IndividualOrderRequestDTO dto) {
@@ -167,20 +151,14 @@ public class OrderServiceImpl implements OrderService {
         if (product.getQuantity() < dto.getQuantity())
             throw new RuntimeException("Insufficient stock for product: " + product.getName());
 
-        // Deduct stock
         product.setQuantity(product.getQuantity() - dto.getQuantity());
         productRepository.save(product);
 
-        // ✅ Create CartItem properly linked to user & product
-        CartItem cartItem = new CartItem();
-        cartItem.setProduct(product);
-        cartItem.setQuantity(dto.getQuantity());
-        cartItem.setUser(user);
+        CartItem cartItem = new CartItem(null, user, product, dto.getQuantity());
 
-        // ✅ Create and link order
         Order order = new Order();
         order.setUser(user);
-        order.setItems(List.of(cartItem)); // link the single item
+        order.setItems(List.of(cartItem));
         order.setTotalPrice(product.getPrice() * dto.getQuantity());
         order.setOrderId(OrderIdGenerator.generateOrderId());
         order.setStatus("PAID");
@@ -189,10 +167,8 @@ public class OrderServiceImpl implements OrderService {
         order.setPaidAt(LocalDateTime.now());
         order.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(4));
 
-        // ✅ Save order (will cascade CartItem)
         Order savedOrder = orderRepository.save(order);
 
-        // ✅ Start Temporal workflow after commit
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -202,8 +178,7 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
                 WorkflowClient.start(() ->
-                        workflow.processOrder(
-                                savedOrder.getId().toString(),
+                        workflow.processOrder(savedOrder.getOrderId(),
                                 savedOrder.getTotalPrice(),
                                 user.getId().toString()));
             }
@@ -212,48 +187,80 @@ public class OrderServiceImpl implements OrderService {
         return mapToDTO(savedOrder);
     }
 
-
-    @Override @Transactional
-    public void cancelOrder(String token, Long orderId) {
+    // ✅ Cancel order
+    @Override
+    @Transactional
+    public void cancelOrder(String token, String orderId) {
         User user = getUserFromToken(token);
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        if (!order.getUser().equals(user)) throw new RuntimeException("Not your order");
-        if (order.getStatus().equals("DELIVERED")) throw new RuntimeException("Cannot cancel delivered order");
+        if (!order.getUser().equals(user))
+            throw new RuntimeException("Not your order");
+        if (order.getStatus().equals("DELIVERED"))
+            throw new RuntimeException("Cannot cancel delivered order");
 
         order.setStatus("CANCELLED");
+        order.setRefundStatus("PENDING");
         orderRepository.save(order);
     }
 
-    @Override @Transactional
-    public void returnOrder(String token, Long orderId) {
+    // ✅ Return order
+    @Override
+    @Transactional
+    public void returnOrder(String token, String orderId) {
         User user = getUserFromToken(token);
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        if (!order.getUser().equals(user)) throw new RuntimeException("Not your order");
-        if (!order.getStatus().equals("DELIVERED")) throw new RuntimeException("Only delivered orders can be returned");
+        if (!order.getUser().equals(user))
+            throw new RuntimeException("Not your order");
+        if (!order.getStatus().equals("DELIVERED"))
+            throw new RuntimeException("Only delivered orders can be returned");
 
         order.setStatus("RETURNED");
+        order.setRefundStatus("PENDING");
         orderRepository.save(order);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                WorkflowClient client = WorkflowClient.newInstance(temporalService.getService());
+                WorkflowOptions options = WorkflowOptions.newBuilder()
+                        .setTaskQueue("E_SHOPPING_TASK_QUEUE")
+                        .build();
+                OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
+                WorkflowClient.start(() ->
+                        workflow.scheduleRefund(order.getOrderId(), user.getId().toString(), 1)); // 1-day delay
+            }
+        });
     }
 
+    // ✅ Fetch all user orders
     @Override
     public List<OrderResponseDTO> getUserOrders(String token) {
         User user = getUserFromToken(token);
         return orderRepository.findByUser(user).stream()
-                .map(this::mapToDTO).collect(Collectors.toList());
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private User getUserFromToken(String token) {
+        String email = jwtUtil.getEmailFromToken(token);
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     private OrderResponseDTO mapToDTO(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO();
-        dto.setOrderId(order.getOrderId() != null ? order.getOrderId() : "ORD-" + order.getId());
+        dto.setOrderId(order.getOrderId());
         dto.setStatus(order.getStatus());
         dto.setPaymentId(order.getPaymentId());
         dto.setTotalAmount(order.getTotalPrice());
         dto.setOrderDate(order.getOrderDate());
         dto.setPaidAt(order.getPaidAt());
+        dto.setRefundAt(order.getRefundAt());
+        dto.setRefundStatus(order.getRefundStatus());
         dto.setEstimatedDeliveryDate(order.getEstimatedDeliveryDate());
 
         List<OrderItemDTO> items = order.getItems().stream().map(ci -> {
@@ -268,11 +275,5 @@ public class OrderServiceImpl implements OrderService {
 
         dto.setItems(items);
         return dto;
-    }
-
-    private User getUserFromToken(String token) {
-        String email = jwtUtil.getEmailFromToken(token);
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

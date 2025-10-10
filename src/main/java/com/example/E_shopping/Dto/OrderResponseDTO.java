@@ -12,13 +12,16 @@ public class OrderResponseDTO {
     private Double totalAmount;
     private String status;
     private String paymentId;
-    // timestamps for client display
+
+    // usern vies display
     private LocalDateTime estimatedDeliveryDate;
     private LocalDateTime paidAt;
     private LocalDateTime preparingAt;
     private LocalDateTime outForDeliveryAt;
     private LocalDateTime deliveredAt;
 
-    // IMPORTANT: real field for order date
     private LocalDateTime orderDate;
+
+    private LocalDateTime refundAt;
+    private String refundStatus;
 }

@@ -30,20 +30,20 @@ public class OrderController {
     // pay for order
     @PostMapping("/pay/{orderId}")
     public ResponseEntity<OrderResponseDTO> payOrder(@RequestHeader("X-Auth") String token,
-                                                     @PathVariable Long orderId) {
+                                                     @PathVariable String orderId) {
         return ResponseEntity.ok(orderService.payOrder(token, orderId));
     }
     // cancel order
     @PostMapping("/cancel/{orderId}")
     public ResponseEntity<String> cancelOrder(@RequestHeader("X-Auth") String token,
-                                              @PathVariable Long orderId) {
+                                              @PathVariable String orderId) {
         orderService.cancelOrder(token, orderId);
         return ResponseEntity.ok("Order cancelled successfully");
     }
     // return any order
     @PostMapping("/return/{orderId}")
     public ResponseEntity<String> returnOrder(@RequestHeader("X-Auth") String token,
-                                              @PathVariable Long orderId) {
+                                              @PathVariable String orderId) {
         orderService.returnOrder(token, orderId);
         return ResponseEntity.ok("Order returned successfully");
     }

@@ -72,4 +72,16 @@ public class OrderActivitiesImpl implements OrderActivities {
         order.setEstimatedDeliveryDate(estimatedDate);
         orderRepository.save(order);
     }
+    @Override
+    public void processRefund(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        order.setRefundStatus("COMPLETED");
+        order.setRefundAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        System.out.println("✅ Refund completed for Order ID: " + order.getOrderId());
+    }
+
 }

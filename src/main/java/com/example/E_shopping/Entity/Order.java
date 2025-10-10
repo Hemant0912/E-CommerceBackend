@@ -37,4 +37,7 @@ public class Order {
     private LocalDateTime preparingAt;
     private LocalDateTime outForDeliveryAt;
     private LocalDateTime deliveredAt;
+
+    private LocalDateTime refundAt;
+    private String refundStatus;
 }
