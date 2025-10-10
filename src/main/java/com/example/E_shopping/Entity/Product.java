@@ -1,5 +1,6 @@
 package com.example.E_shopping.Entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,10 +22,10 @@ public class Product {
     private String description;
 
     @Column(nullable = false, length = 100)
-    private String type; // like phone, laptop, etc
+    private String type; // like phone, laptop
 
     @Column(nullable = false, length = 100)
-    private String category; // electronics like eg
+    private String category; // electronics like
 
     @Column(nullable = false, length = 100)
     private String color;
@@ -37,5 +38,6 @@ public class Product {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merchant_id", nullable = false)
+    @JsonIgnore
     private Merchant merchant;
 }

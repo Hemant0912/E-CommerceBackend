@@ -10,7 +10,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableMethodSecurity // Enable @PreAuthorize on methods
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -20,16 +20,20 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // public api signup/login allowed for both user and merchant
-                        .requestMatchers("/public/**",
+                        // Public APIs
+                        .requestMatchers(
+                                "/public/**",
+                                "/user/signup", "/user/login",
                                 "/merchant/signup", "/merchant/login",
-                                "/user/signup", "/user/login").permitAll()
+                                "/admin/login", "/super-admin/login" // admin login
+                        ).permitAll()
+
+                        // this is for admin and super
+                        .requestMatchers("/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .anyRequest().authenticated()
                 );
 
-        // add jwt filter to check X-auth before processing requests
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 }

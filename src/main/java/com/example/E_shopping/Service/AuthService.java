@@ -36,4 +36,6 @@ public interface AuthService {
 
     String generateToken(Merchant merchant);
 
+    String encodePassword(String rawPassword);
+
 }

@@ -25,7 +25,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    // -------------------- USER --------------------
+   // for user registerr
     @Override
     public UserResponseDTO register(UserRequestDTO dto) {
         if (userRepository.findByEmail(dto.getEmail()).isPresent())
@@ -212,6 +212,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String generateToken(Merchant merchant) {
         return jwtUtil.generateToken(merchant.getEmail(), "MERCHANT");
+    }
+    @Override
+    public String encodePassword(String rawPassword) {
+        return passwordEncoder.encode(rawPassword);
     }
 
 }

@@ -60,7 +60,7 @@ public class MerchantService {
         );
     }
 
-    // Helper: get merchant by email or mobile
+
     public Merchant getMerchantByEmailOrMobile(String emailOrMobile) {
         if (emailOrMobile.matches("^[6-9]\\d{9}$")) {
             return merchantRepository.findByMobile(emailOrMobile)

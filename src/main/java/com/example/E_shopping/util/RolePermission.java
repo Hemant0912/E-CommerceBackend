@@ -19,6 +19,16 @@ public class RolePermission {
                     Permission.DELETE_PRODUCT,
                     Permission.MANAGE_INVENTORY
             );
+            case "ADMIN" -> Set.of(
+                    Permission.VIEW_USERS,
+                    Permission.VIEW_MERCHANTS,
+                    Permission.VIEW_ORDERS,
+                    Permission.VIEW_PRODUCTS
+            );
+            case "SUPER_ADMIN" -> Set.of(
+                    Permission.CREATE_ADMIN,
+                    Permission.MANAGE_ALL
+            );
             default -> Set.of();
         };
     }

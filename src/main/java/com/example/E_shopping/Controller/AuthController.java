@@ -18,8 +18,6 @@ public class AuthController {
     @PostMapping("/user/login")
     public ResponseEntity<UserResponseDTO> loginUser(@Valid @RequestBody AuthRequestDTO dto) {
         AuthResponseDTO auth = authService.loginUser(dto);
-
-        // Create response body without token
         UserResponseDTO response = new UserResponseDTO();
         response.setId(String.valueOf(auth.getId()));
         response.setName(auth.getName());

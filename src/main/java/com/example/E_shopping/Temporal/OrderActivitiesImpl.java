@@ -33,7 +33,7 @@ public class OrderActivitiesImpl implements OrderActivities {
         for (CartItem item : order.getItems()) {
             Product product = item.getProduct();
             if (product.getQuantity() < item.getQuantity()) {
-                throw new RuntimeException("Insufficient stock for product: " + product.getName());
+                throw new RuntimeException("not enough stock for product: " + product.getName());
             }
             product.setQuantity(product.getQuantity() - item.getQuantity());
             productRepository.save(product);
@@ -45,7 +45,7 @@ public class OrderActivitiesImpl implements OrderActivities {
 
     @Override
     public void scheduleDelivery(String orderId, String userId) {
-        System.out.println("Scheduling delivery for order " + orderId + " for user " + userId);
+        System.out.println("Scheduling delivery for ordre " + orderId + " for user " + userId);
     }
 
     @Override
@@ -81,7 +81,7 @@ public class OrderActivitiesImpl implements OrderActivities {
         order.setRefundAt(LocalDateTime.now());
         orderRepository.save(order);
 
-        System.out.println("✅ Refund completed for Order ID: " + order.getOrderId());
+        System.out.println("refund done for: " + order.getOrderId());
     }
 
 }

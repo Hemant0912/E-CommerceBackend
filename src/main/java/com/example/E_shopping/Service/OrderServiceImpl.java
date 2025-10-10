@@ -29,7 +29,7 @@ public class OrderServiceImpl implements OrderService {
     @Autowired private JwtUtil jwtUtil;
     @Autowired private TemporalService temporalService;
 
-    // ✅ Create a new order from cart
+   // order creation
     @Override
     @Transactional
     public OrderResponseDTO createOrder(String token) {
@@ -93,7 +93,7 @@ public class OrderServiceImpl implements OrderService {
         return mapToDTO(savedOrder);
     }
 
-    // ✅ Pay for existing order
+    // payment one
     @Override
     @Transactional
     public OrderResponseDTO payOrder(String token, String orderId) {
@@ -140,7 +140,7 @@ public class OrderServiceImpl implements OrderService {
         return mapToDTO(order);
     }
 
-    // ✅ Order single product
+    // single item order
     @Override
     @Transactional
     public OrderResponseDTO orderSingleItem(String token, IndividualOrderRequestDTO dto) {
@@ -187,7 +187,7 @@ public class OrderServiceImpl implements OrderService {
         return mapToDTO(savedOrder);
     }
 
-    // ✅ Cancel order
+    // cancel
     @Override
     @Transactional
     public void cancelOrder(String token, String orderId) {
@@ -205,7 +205,6 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
     }
 
-    // ✅ Return order
     @Override
     @Transactional
     public void returnOrder(String token, String orderId) {
@@ -236,7 +235,6 @@ public class OrderServiceImpl implements OrderService {
         });
     }
 
-    // ✅ Fetch all user orders
     @Override
     public List<OrderResponseDTO> getUserOrders(String token) {
         User user = getUserFromToken(token);
@@ -272,7 +270,6 @@ public class OrderServiceImpl implements OrderService {
             itemDTO.setTotalPrice(ci.getQuantity() * ci.getProduct().getPrice());
             return itemDTO;
         }).collect(Collectors.toList());
-
         dto.setItems(items);
         return dto;
     }

@@ -16,10 +16,10 @@ public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // internal DB id
+    private Long id;
 
     @Column(unique = true, nullable = false)
-    private String orderId; // ✅ custom readable Order ID like ORD-20251009-HK3D2
+    private String orderId;
 
     @ManyToOne
     private User user;

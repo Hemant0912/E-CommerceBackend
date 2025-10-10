@@ -49,6 +49,6 @@ public class MerchantAuthController {
     @PostMapping("/logout")
     public ResponseEntity<String> logout(@RequestHeader("X-Auth") String token) {
         merchantService.logoutMerchant(token);
-        return ResponseEntity.ok("Logged out successfully");
+        return ResponseEntity.ok("Logged out");
     }
 }

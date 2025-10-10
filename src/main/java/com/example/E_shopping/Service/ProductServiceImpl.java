@@ -1,5 +1,4 @@
 package com.example.E_shopping.Service;
-
 import com.example.E_shopping.Dto.ProductRequestDTO;
 import com.example.E_shopping.Dto.ProductResponseDTO;
 import com.example.E_shopping.Entity.CartItem;
@@ -14,7 +13,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -110,7 +108,7 @@ public class ProductServiceImpl implements ProductService {
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable).map(this::mapToDTO);
     }
-    // ==================== Helper ====================
+
     private ProductResponseDTO mapToDTO(Product product) {
         ProductResponseDTO dto = new ProductResponseDTO();
         dto.setId(product.getId());
@@ -129,37 +127,28 @@ public class ProductServiceImpl implements ProductService {
     }
     @Override
     public List<ProductResponseDTO> searchProducts(String category, String type, String color, String keyword) {
-        // Start with all products
         List<Product> products = productRepository.findAll();
 
-        // Filter by category if provided
         if (category != null && !category.isEmpty()) {
             products = products.stream()
                     .filter(p -> p.getCategory() != null && p.getCategory().equalsIgnoreCase(category))
                     .collect(Collectors.toList());
         }
-
-        // Filter by type if provided
         if (type != null && !type.isEmpty()) {
             products = products.stream()
                     .filter(p -> p.getType() != null && p.getType().equalsIgnoreCase(type))
                     .collect(Collectors.toList());
         }
-
-        // Filter by color if provided
         if (color != null && !color.isEmpty()) {
             products = products.stream()
                     .filter(p -> p.getColor() != null && p.getColor().equalsIgnoreCase(color))
                     .collect(Collectors.toList());
         }
-
-        // Filter by keyword (name) if provided
         if (keyword != null && !keyword.isEmpty()) {
             products = products.stream()
                     .filter(p -> p.getName() != null && p.getName().toLowerCase().contains(keyword.toLowerCase()))
                     .collect(Collectors.toList());
         }
-
         return products.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 

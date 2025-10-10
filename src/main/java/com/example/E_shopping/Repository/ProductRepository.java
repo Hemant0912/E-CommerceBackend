@@ -25,7 +25,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByTypeIgnoreCaseAndColorIgnoreCase(String type, String color);
 
-    // Optional: helper methods for more combinations if needed
     List<Product> findByCategoryIgnoreCaseAndTypeIgnoreCase(String category, String type);
+
     List<Product> findByCategoryIgnoreCaseAndTypeIgnoreCaseAndColorIgnoreCase(String category, String type, String color);
 }

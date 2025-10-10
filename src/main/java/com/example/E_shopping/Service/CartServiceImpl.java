@@ -32,7 +32,7 @@ public class CartServiceImpl implements CartService {
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        // ✅ if already exists, just increase quantity (don’t create duplicate)
+        // for quantity increasing
         CartItem existing = cartItemRepository.findByUserAndProduct(user, product).orElse(null);
         if (existing != null) {
             existing.setQuantity(existing.getQuantity() + dto.getQuantity());
@@ -40,7 +40,7 @@ public class CartServiceImpl implements CartService {
             return mapToDTO(existing);
         }
 
-        // ✅ else create new item
+        // new item creation
         CartItem newItem = new CartItem(null, user, product, dto.getQuantity());
         cartItemRepository.save(newItem);
         return mapToDTO(newItem);
@@ -91,7 +91,7 @@ public class CartServiceImpl implements CartService {
         return response;
     }
 
-    // ✅ Implement checkout by delegating to OrderService
+    // payment one
     @Override
     @Transactional
     public OrderResponseDTO checkout(String token) {
