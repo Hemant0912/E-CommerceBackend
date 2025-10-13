@@ -48,7 +48,7 @@ public class CartController {
     // for payment
     @PostMapping("/checkout")
     public ResponseEntity<OrderResponseDTO> checkout(@RequestHeader("X-Auth") String token) {
-        OrderResponseDTO responseDTO = cartService.checkout(token); // server calculates total
+        OrderResponseDTO responseDTO = cartService.checkout(token); // total money
         return ResponseEntity.ok(responseDTO);
     }
 

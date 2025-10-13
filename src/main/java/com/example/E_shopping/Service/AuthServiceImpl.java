@@ -8,24 +8,24 @@ import com.example.E_shopping.Repository.MerchantRepository;
 import com.example.E_shopping.util.JwtUtil;
 import com.example.E_shopping.util.RolePermission;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private MerchantRepository merchantRepository;
-
-    @Autowired
-    private JwtUtil jwtUtil;
+    @Autowired private UserRepository userRepository;
+    @Autowired private MerchantRepository merchantRepository;
+    @Autowired private JwtUtil jwtUtil;
+    @Autowired private RedisTemplate<String, String> redisTemplate;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final long TOKEN_EXPIRATION_SECONDS = 24 * 60 * 60; // 24 hours
 
-   // for user registerr
+  // register
     @Override
     public UserResponseDTO register(UserRequestDTO dto) {
         if (userRepository.findByEmail(dto.getEmail()).isPresent())
@@ -40,7 +40,6 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setRole("USER");
         user.setAddress(dto.getAddress());
-        user.setLatestToken("");
         user.setPermissions(RolePermission.getPermissions("USER"));
 
         User saved = userRepository.save(user);
@@ -55,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    //  login
     @Override
     public AuthResponseDTO loginUser(AuthRequestDTO dto) {
         User user = dto.getEmailOrMobile().contains("@") ?
@@ -81,42 +81,35 @@ public class AuthServiceImpl implements AuthService {
         return response;
     }
 
+   // logout
     @Override
     public void logoutUser(String token) {
         if (token == null || !jwtUtil.validateToken(token))
             throw new IllegalArgumentException("Invalid token");
 
         String email = jwtUtil.getEmailFromToken(token);
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        if (!token.equals(user.getLatestToken()))
-            throw new IllegalArgumentException("Token already invalidated");
-
-        user.setLatestToken("");
-        userRepository.save(user);
+        String redisKey = "USER_TOKEN:" + email; // matches single-token key
+        redisTemplate.delete(redisKey); // remove the single token
     }
 
-    @Override
-    public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    }
-
-    @Override
-    public User getUserByMobile(String mobile) {
-        return userRepository.findByMobile(mobile)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    }
-
+    // token
     @Override
     public String generateAndSaveToken(User user) {
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
-        user.setLatestToken(token); // overwrite old token
-        userRepository.save(user);
+        String redisKey = "USER_TOKEN:" + user.getEmail(); // single-token key
+
+        redisTemplate.opsForValue().set(redisKey, token, TOKEN_EXPIRATION_SECONDS, TimeUnit.SECONDS);
         return token;
     }
 
+    public boolean isUserTokenValid(String token) {
+        String email = jwtUtil.getEmailFromToken(token);
+        String redisKey = "USER_TOKEN:" + email;
+        Object latestToken = redisTemplate.opsForValue().get(redisKey);
+        return latestToken != null && token.equals(latestToken) && jwtUtil.validateToken(token);
+    }
+
+    // -------------------- MERCHANT METHODS --------------------
     @Override
     public MerchantResponseDTO registerMerchant(MerchantRequestDTO dto) {
         if (merchantRepository.findByEmail(dto.getEmail()).isPresent())
@@ -129,7 +122,6 @@ public class AuthServiceImpl implements AuthService {
         merchant.setEmail(dto.getEmail());
         merchant.setMobile(dto.getMobile());
         merchant.setPassword(passwordEncoder.encode(dto.getPassword()));
-        merchant.setLatestToken("");
 
         Merchant saved = merchantRepository.save(merchant);
 
@@ -172,50 +164,26 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Invalid token");
 
         String email = jwtUtil.getEmailFromToken(token);
-        Merchant merchant = merchantRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
-
-        if (!token.equals(merchant.getLatestToken()))
-            throw new IllegalArgumentException("Token already invalidated");
-
-        merchant.setLatestToken("");
-        merchantRepository.save(merchant);
-    }
-
-    @Override
-    public Merchant getMerchantByEmail(String email) {
-        return null;
-    }
-
-    @Override
-    public Merchant getMerchantByMobile(String mobile) {
-        return null;
+        String redisKey = "MERCHANT_TOKEN:" + email;
+        redisTemplate.delete(redisKey);
     }
 
     @Override
     public String generateAndSaveToken(Merchant merchant) {
         String token = jwtUtil.generateToken(merchant.getEmail(), "MERCHANT");
-        merchant.setLatestToken(token);
-        merchantRepository.save(merchant);
+        String redisKey = "MERCHANT_TOKEN:" + merchant.getEmail();
+
+        redisTemplate.opsForValue().set(redisKey, token, TOKEN_EXPIRATION_SECONDS, TimeUnit.SECONDS);
         return token;
     }
-    @Override
-    public boolean validatePassword(String rawPassword, String encodedPassword) {
-        return passwordEncoder.matches(rawPassword, encodedPassword);
-    }
 
-    @Override
-    public String generateToken(User user) {
-        return jwtUtil.generateToken(user.getEmail(), user.getRole());
-    }
-
-    @Override
-    public String generateToken(Merchant merchant) {
-        return jwtUtil.generateToken(merchant.getEmail(), "MERCHANT");
-    }
-    @Override
-    public String encodePassword(String rawPassword) {
-        return passwordEncoder.encode(rawPassword);
-    }
-
+    // -------------------- UTILS --------------------
+    @Override public boolean validatePassword(String raw, String encoded) { return passwordEncoder.matches(raw, encoded); }
+    @Override public String encodePassword(String raw) { return passwordEncoder.encode(raw); }
+    @Override public String generateToken(User u) { return jwtUtil.generateToken(u.getEmail(), u.getRole()); }
+    @Override public String generateToken(Merchant m) { return jwtUtil.generateToken(m.getEmail(), "MERCHANT"); }
+    @Override public User getUserByEmail(String email) { return userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("User not found")); }
+    @Override public User getUserByMobile(String mobile) { return userRepository.findByMobile(mobile).orElseThrow(() -> new IllegalArgumentException("User not found")); }
+    @Override public Merchant getMerchantByEmail(String email) { return merchantRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("Merchant not found")); }
+    @Override public Merchant getMerchantByMobile(String mobile) { return merchantRepository.findByMobile(mobile).orElseThrow(() -> new IllegalArgumentException("Merchant not found")); }
 }

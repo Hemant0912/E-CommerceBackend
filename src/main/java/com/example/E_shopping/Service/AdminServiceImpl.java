@@ -1,5 +1,7 @@
 package com.example.E_shopping.Service;
+
 import com.example.E_shopping.Dto.*;
+import com.example.E_shopping.Entity.Permission;
 import com.example.E_shopping.Entity.User;
 import com.example.E_shopping.Repository.UserRepository;
 import com.example.E_shopping.Repository.ProductRepository;
@@ -10,6 +12,7 @@ import com.example.E_shopping.util.RolePermission;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
@@ -28,15 +31,15 @@ public class AdminServiceImpl implements AdminService {
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    // new admin by super admin
+    // Create new admin by SUPER_ADMIN
     @Override
-    public AuthResponseDTO createAdmin(String token, UserResponseDTO dto) {
+    public AuthResponseDTO createAdmin(String token, UserRequestDTO dto) {
         String email = jwtUtil.getEmailFromToken(token);
         User superAdmin = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Invalid token"));
 
         if (!"SUPER_ADMIN".equals(superAdmin.getRole())) {
-            throw new RuntimeException("Only SUPER_ADMIN can create new admins");
+            throw new RuntimeException("Only SUPER ADMIN can create new admins");
         }
 
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
@@ -47,11 +50,11 @@ public class AdminServiceImpl implements AdminService {
         admin.setName(dto.getName());
         admin.setEmail(dto.getEmail());
         admin.setMobile(dto.getMobile());
-        admin.setPassword(encoder.encode("Admin@123")); // default password
+        admin.setPassword(encoder.encode(dto.getPassword()));
         admin.setRole("ADMIN");
         admin.setPermissions(RolePermission.getPermissions("ADMIN"));
         admin.setAddress(dto.getAddress());
-        admin.setLatestToken("");
+        admin.setLatestToken(null);
 
         userRepository.save(admin);
 
@@ -65,18 +68,40 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public List<User> getAllUsers(String token) {
+    public List<AdminViewUserDTO> getAllUsers(String token) {
         validateAdminOrSuperAdmin(token);
+
         return userRepository.findAll().stream()
                 .filter(u -> "USER".equals(u.getRole()))
+                .map(u -> new AdminViewUserDTO(
+                        u.getId(),
+                        u.getName(),
+                        u.getEmail(),
+                        u.getMobile(),
+                        u.getRole(),
+                        u.getAddress(),
+                        u.getPermissions().stream()
+                                .map(Permission::name)
+                                .toList()
+                ))
                 .toList();
     }
 
+
+
+
     @Override
-    public List<User> getAllMerchants(String token) {
+    public List<AdminViewMerchantDTO> getAllMerchants(String token) {
         validateAdminOrSuperAdmin(token);
-        return userRepository.findAll().stream()
-                .filter(u -> "MERCHANT".equals(u.getRole()))
+
+        return merchantRepository.findAll().stream()
+                .map(m -> new AdminViewMerchantDTO(
+                        m.getId(),
+                        m.getName(),
+                        m.getEmail(),
+                        m.getMobile(),
+                        "MERCHANT"
+                ))
                 .toList();
     }
 
@@ -95,7 +120,6 @@ public class AdminServiceImpl implements AdminService {
                     dto.setColor(product.getColor());
                     dto.setPrice(product.getPrice());
                     dto.setQuantity(product.getQuantity());
-
                     if (product.getMerchant() != null) {
                         dto.setMerchantId(product.getMerchant().getId());
                         dto.setMerchantName(product.getMerchant().getName());
@@ -104,40 +128,39 @@ public class AdminServiceImpl implements AdminService {
                 }).toList();
     }
 
-
     @Override
     public Object getAllOrders(String token) {
         validateAdminOrSuperAdmin(token);
-        return orderRepository.findAll().stream().map(order -> {
-            OrderResponseDTO dto = new OrderResponseDTO();
-            dto.setOrderId(order.getOrderId());
-            dto.setStatus(order.getStatus());
-            dto.setTotalAmount(order.getTotalPrice());
-            dto.setPaymentId(order.getPaymentId());
-            dto.setOrderDate(order.getOrderDate());
-            dto.setPaidAt(order.getPaidAt());
-            dto.setPreparingAt(order.getPreparingAt());
-            dto.setOutForDeliveryAt(order.getOutForDeliveryAt());
-            dto.setDeliveredAt(order.getDeliveredAt());
-            dto.setEstimatedDeliveryDate(order.getEstimatedDeliveryDate());
-            dto.setRefundAt(order.getRefundAt());
-            dto.setRefundStatus(order.getRefundStatus());
 
-            List<OrderItemDTO> items = order.getItems().stream().map(item -> {
-                OrderItemDTO itemDTO = new OrderItemDTO();
-                itemDTO.setProductId(item.getProduct().getId());
-                itemDTO.setProductName(item.getProduct().getName());
-                itemDTO.setPrice(item.getProduct().getPrice());
-                itemDTO.setQuantity(item.getQuantity());
-                itemDTO.setTotalPrice(item.getProduct().getPrice() * item.getQuantity());
-                return itemDTO;
-            }).toList();
+        return orderRepository.findAll().stream()
+                .map(order -> {
+                    OrderResponseDTO dto = new OrderResponseDTO();
+                    dto.setOrderId(order.getOrderId());
+                    dto.setStatus(order.getStatus());
+                    dto.setTotalAmount(order.getTotalPrice());
+                    dto.setPaymentId(order.getPaymentId());
+                    dto.setOrderDate(order.getOrderDate());
+                    dto.setPaidAt(order.getPaidAt());
+                    dto.setPreparingAt(order.getPreparingAt());
+                    dto.setOutForDeliveryAt(order.getOutForDeliveryAt());
+                    dto.setDeliveredAt(order.getDeliveredAt());
+                    dto.setEstimatedDeliveryDate(order.getEstimatedDeliveryDate());
+                    dto.setRefundAt(order.getRefundAt());
+                    dto.setRefundStatus(order.getRefundStatus());
 
-            dto.setItems(items);
-            return dto;
-        }).toList();
+                    List<OrderItemDTO> items = order.getItems().stream().map(item -> {
+                        OrderItemDTO itemDTO = new OrderItemDTO();
+                        itemDTO.setProductId(item.getProduct().getId());
+                        itemDTO.setProductName(item.getProduct().getName());
+                        itemDTO.setPrice(item.getProduct().getPrice());
+                        itemDTO.setQuantity(item.getQuantity());
+                        itemDTO.setTotalPrice(item.getProduct().getPrice() * item.getQuantity());
+                        return itemDTO;
+                    }).toList();
+                    dto.setItems(items);
+                    return dto;
+                }).toList();
     }
-
 
     private void validateAdminOrSuperAdmin(String token) {
         String email = jwtUtil.getEmailFromToken(token);

@@ -10,10 +10,14 @@ import com.example.E_shopping.Repository.UserRepository;
 import com.example.E_shopping.Repository.OrderRepository;
 import com.example.E_shopping.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.*;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class CartServiceImpl implements CartService {
@@ -22,9 +26,12 @@ public class CartServiceImpl implements CartService {
     @Autowired private ProductRepository productRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private OrderRepository orderRepository;
-    @Autowired private OrderService orderService; // delegate checkout
-
+    @Autowired private OrderService orderService;
     @Autowired private JwtUtil jwtUtil;
+
+    @Autowired private RedisTemplate<String, Object> redisTemplate;
+
+    private static final long CART_TTL_HOURS = 48;
 
     @Override
     public CartItemResponseDTO addToCart(String token, CartItemRequestDTO dto) {
@@ -32,20 +39,19 @@ public class CartServiceImpl implements CartService {
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        // for quantity increasing
         CartItem existing = cartItemRepository.findByUserAndProduct(user, product).orElse(null);
         if (existing != null) {
             existing.setQuantity(existing.getQuantity() + dto.getQuantity());
             cartItemRepository.save(existing);
+            cacheCart(user.getId());
             return mapToDTO(existing);
         }
 
-        // new item creation
         CartItem newItem = new CartItem(null, user, product, dto.getQuantity());
         cartItemRepository.save(newItem);
+        cacheCart(user.getId());
         return mapToDTO(newItem);
     }
-
 
     @Override
     public CartItemResponseDTO updateCartItem(String token, Long productId, CartItemRequestDTO dto) {
@@ -58,6 +64,7 @@ public class CartServiceImpl implements CartService {
 
         cartItem.setQuantity(dto.getQuantity());
         cartItemRepository.save(cartItem);
+        cacheCart(user.getId());
         return mapToDTO(cartItem);
     }
 
@@ -71,13 +78,13 @@ public class CartServiceImpl implements CartService {
                 .orElseThrow(() -> new RuntimeException("Product not in cart"));
 
         cartItemRepository.delete(cartItem);
+        cacheCart(user.getId());
     }
 
     @Override
     public List<CartItemResponseDTO> getCartItems(String token) {
         User user = getUserFromToken(token);
-        return cartItemRepository.findByUser(user)
-                .stream().map(this::mapToDTO).collect(Collectors.toList());
+        return getCartFromCache(user.getId());
     }
 
     @Override
@@ -91,11 +98,13 @@ public class CartServiceImpl implements CartService {
         return response;
     }
 
-    // payment one
     @Override
     @Transactional
     public OrderResponseDTO checkout(String token) {
-        return orderService.createOrder(token);
+        User user = getUserFromToken(token);
+        OrderResponseDTO order = orderService.createOrder(token);
+        redisTemplate.delete("CART:" + user.getId());
+        return order;
     }
 
     private CartItemResponseDTO mapToDTO(CartItem cartItem) {
@@ -113,5 +122,28 @@ public class CartServiceImpl implements CartService {
         String email = jwtUtil.getEmailFromToken(token);
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    private void cacheCart(Long userId) {
+        List<CartItemResponseDTO> items = cartItemRepository.findByUser(userRepository.findById(userId).get())
+                .stream().map(this::mapToDTO).collect(Collectors.toList());
+        redisTemplate.opsForValue().set("CART:" + userId, items, CART_TTL_HOURS, TimeUnit.HOURS);
+    }
+
+    private List<CartItemResponseDTO> getCartFromCache(Long userId) {
+        Object cachedData = redisTemplate.opsForValue().get("CART:" + userId);
+
+        if (cachedData == null) {
+            cacheCart(userId);
+            cachedData = redisTemplate.opsForValue().get("CART:" + userId);
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<CartItemResponseDTO> items = mapper.convertValue(
+                cachedData,
+                new TypeReference<List<CartItemResponseDTO>>() {}
+        );
+
+        return items;
     }
 }

@@ -31,7 +31,7 @@ public class MerchantAuthController {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        String token = merchantService.generateAndSaveMerchantToken(merchant);
+        String token = merchantService.generateAndSaveTokenInRedis(merchant);
 
         MerchantResponseDTO response = new MerchantResponseDTO();
         response.setId(String.valueOf(merchant.getId()));

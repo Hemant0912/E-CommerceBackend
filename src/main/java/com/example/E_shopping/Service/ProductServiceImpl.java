@@ -1,4 +1,5 @@
 package com.example.E_shopping.Service;
+
 import com.example.E_shopping.Dto.ProductRequestDTO;
 import com.example.E_shopping.Dto.ProductResponseDTO;
 import com.example.E_shopping.Entity.CartItem;
@@ -9,11 +10,13 @@ import com.example.E_shopping.Repository.MerchantRepository;
 import com.example.E_shopping.Repository.ProductRepository;
 import com.example.E_shopping.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,15 +34,19 @@ public class ProductServiceImpl implements ProductService {
     @Autowired
     private CartItemRepository cartItemRepository;
 
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    private static final long PRODUCT_CACHE_TTL_MINUTES = 60;
+
     @Override
     public ProductResponseDTO addProduct(ProductRequestDTO dto) {
         String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Merchant merchant = merchantRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
 
-        if (productRepository.existsByMerchantAndNameIgnoreCase(merchant, dto.getName())) {
-            throw new IllegalArgumentException("Product with the same name already exists for this merchant");
-        }
+        if (productRepository.existsByMerchantAndNameIgnoreCase(merchant, dto.getName()))
+            throw new IllegalArgumentException("Product with the same name already exists");
 
         Product product = new Product();
         product.setName(dto.getName());
@@ -48,24 +55,13 @@ public class ProductServiceImpl implements ProductService {
         product.setCategory(dto.getCategory());
         product.setColor(dto.getColor());
         product.setPrice(dto.getPrice());
-
-        if (dto.getQuantity() != null) product.setQuantity(dto.getQuantity());
-        else if (dto.getStock() != null) product.setQuantity(dto.getStock());
-        else product.setQuantity(0);
-
+        product.setQuantity(dto.getQuantity() != null ? dto.getQuantity() : (dto.getStock() != null ? dto.getStock() : 0));
         product.setMerchant(merchant);
+
         Product saved = productRepository.save(product);
+
+        redisTemplate.opsForValue().set("PRODUCT:" + saved.getId(), saved, PRODUCT_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         return mapToDTO(saved);
-    }
-
-    @Override
-    public List<ProductResponseDTO> listProducts(String token) {
-        String email = jwtUtil.getEmailFromToken(token);
-        Merchant merchant = merchantRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
-
-        return productRepository.findByMerchant(merchant)
-                .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
     @Override
@@ -83,6 +79,9 @@ public class ProductServiceImpl implements ProductService {
         else if (dto.getStock() != null) product.setQuantity(dto.getStock());
 
         Product updated = productRepository.save(product);
+
+        // Update cache
+        redisTemplate.opsForValue().set("PRODUCT:" + updated.getId(), updated, PRODUCT_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         return mapToDTO(updated);
     }
 
@@ -95,18 +94,64 @@ public class ProductServiceImpl implements ProductService {
         if (!relatedCartItems.isEmpty()) cartItemRepository.deleteAll(relatedCartItems);
 
         productRepository.delete(product);
+        redisTemplate.delete("PRODUCT:" + id);
     }
 
     @Override
     public ProductResponseDTO getProductById(Long id) {
+        // Redis cache first
+        Product cachedProduct = (Product) redisTemplate.opsForValue().get("PRODUCT:" + id);
+        if (cachedProduct != null) return mapToDTO(cachedProduct);
+
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+        redisTemplate.opsForValue().set("PRODUCT:" + product.getId(), product, PRODUCT_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         return mapToDTO(product);
     }
 
     @Override
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable).map(this::mapToDTO);
+    }
+
+    @Override
+    public List<ProductResponseDTO> listProducts(String token) {
+        String email = jwtUtil.getEmailFromToken(token);
+        Merchant merchant = merchantRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
+
+        return productRepository.findByMerchant(merchant).stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponseDTO> searchProducts(String category, String type, String color, String keyword) {
+        List<Product> products = productRepository.findAll();
+
+        if (category != null && !category.isEmpty()) {
+            products = products.stream().filter(p -> category.equalsIgnoreCase(p.getCategory())).collect(Collectors.toList());
+        }
+        if (type != null && !type.isEmpty()) {
+            products = products.stream().filter(p -> type.equalsIgnoreCase(p.getType())).collect(Collectors.toList());
+        }
+        if (color != null && !color.isEmpty()) {
+            products = products.stream().filter(p -> color.equalsIgnoreCase(p.getColor())).collect(Collectors.toList());
+        }
+        if (keyword != null && !keyword.isEmpty()) {
+            products = products.stream().filter(p -> p.getName() != null && p.getName().toLowerCase().contains(keyword.toLowerCase())).collect(Collectors.toList());
+        }
+
+        return products.stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductResponseDTO> searchProductsPaginated(String category, String type, String color, String keyword,
+                                                            int page, int size, String sortBy) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(sortBy).descending());
+        return productRepository.searchProducts(category, type, color, keyword, pageable)
+                .map(this::mapToDTO);
     }
 
     private ProductResponseDTO mapToDTO(Product product) {
@@ -125,31 +170,4 @@ public class ProductServiceImpl implements ProductService {
         }
         return dto;
     }
-    @Override
-    public List<ProductResponseDTO> searchProducts(String category, String type, String color, String keyword) {
-        List<Product> products = productRepository.findAll();
-
-        if (category != null && !category.isEmpty()) {
-            products = products.stream()
-                    .filter(p -> p.getCategory() != null && p.getCategory().equalsIgnoreCase(category))
-                    .collect(Collectors.toList());
-        }
-        if (type != null && !type.isEmpty()) {
-            products = products.stream()
-                    .filter(p -> p.getType() != null && p.getType().equalsIgnoreCase(type))
-                    .collect(Collectors.toList());
-        }
-        if (color != null && !color.isEmpty()) {
-            products = products.stream()
-                    .filter(p -> p.getColor() != null && p.getColor().equalsIgnoreCase(color))
-                    .collect(Collectors.toList());
-        }
-        if (keyword != null && !keyword.isEmpty()) {
-            products = products.stream()
-                    .filter(p -> p.getName() != null && p.getName().toLowerCase().contains(keyword.toLowerCase()))
-                    .collect(Collectors.toList());
-        }
-        return products.stream().map(this::mapToDTO).collect(Collectors.toList());
-    }
-
 }

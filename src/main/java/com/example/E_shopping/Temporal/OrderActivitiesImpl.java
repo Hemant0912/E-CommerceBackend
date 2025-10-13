@@ -24,12 +24,10 @@ public class OrderActivitiesImpl implements OrderActivities {
         Long id = Long.parseLong(orderId);
         Order order = orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
 
-        // Mark order as PAID and set timestamp
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
         order.setPaymentId("PAY-" + System.currentTimeMillis());
 
-        // Decrement stock
         for (CartItem item : order.getItems()) {
             Product product = item.getProduct();
             if (product.getQuantity() < item.getQuantity()) {

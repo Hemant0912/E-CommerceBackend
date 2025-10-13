@@ -22,7 +22,8 @@ public class UserRequestDTO {
     @NotBlank(message = "Password cannot be empty")
     private String password;
 
+    @NotBlank(message = "Address cannot be empty")
+    @Size(min = 10, message = "Address should be at least 10 characters long")
+    @Pattern(regexp = "^[a-zA-Z0-9\\s,.-]+$", message = "Address contains invalid characters")
     private String address;
-
-
 }

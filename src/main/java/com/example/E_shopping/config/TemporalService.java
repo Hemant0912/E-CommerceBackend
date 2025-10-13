@@ -27,8 +27,6 @@ public class TemporalService {
 
         // this is for workflow client
         client = WorkflowClient.newInstance(service);
-
-        // ⚡ Make worker listen on the same queue as your workflow starts
         WorkerFactory factory = WorkerFactory.newInstance(client);
         Worker worker = factory.newWorker("E_SHOPPING_TASK_QUEUE"); // use same queue
         worker.registerWorkflowImplementationTypes(OrderWorkflowImpl.class); // only OrderWorkflow

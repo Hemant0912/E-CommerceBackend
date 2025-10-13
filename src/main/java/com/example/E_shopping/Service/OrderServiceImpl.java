@@ -1,15 +1,28 @@
 package com.example.E_shopping.Service;
 
-import com.example.E_shopping.Dto.*;
-import com.example.E_shopping.Entity.*;
-import com.example.E_shopping.Repository.*;
+import com.example.E_shopping.Dto.IndividualOrderRequestDTO;
+import com.example.E_shopping.Dto.OrderItemDTO;
+import com.example.E_shopping.Dto.OrderResponseDTO;
+import com.example.E_shopping.Entity.CartItem;
+import com.example.E_shopping.Entity.Order;
+import com.example.E_shopping.Entity.Product;
+import com.example.E_shopping.Entity.User;
+import com.example.E_shopping.Repository.CartItemRepository;
+import com.example.E_shopping.Repository.OrderRepository;
+import com.example.E_shopping.Repository.ProductRepository;
+import com.example.E_shopping.Repository.UserRepository;
 import com.example.E_shopping.Temporal.OrderWorkflow;
 import com.example.E_shopping.config.TemporalService;
 import com.example.E_shopping.util.JwtUtil;
 import com.example.E_shopping.util.OrderIdGenerator;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -17,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,13 +42,16 @@ public class OrderServiceImpl implements OrderService {
     @Autowired private UserRepository userRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private TemporalService temporalService;
+    @Autowired private RedisTemplate<String, Object> redisTemplate;
 
-   // order creation
+    private static final long ORDER_PENDING_TTL_HOURS = 2;
+    private static final String ORDER_SERVICE_CB = "orderServiceCircuitBreaker";
+
     @Override
     @Transactional
+    @CircuitBreaker(name = ORDER_SERVICE_CB, fallbackMethod = "createOrderFallback")
     public OrderResponseDTO createOrder(String token) {
         User user = getUserFromToken(token);
-
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
         if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
 
@@ -45,18 +62,14 @@ public class OrderServiceImpl implements OrderService {
 
         double totalPrice = 0;
         List<CartItem> finalItems = new ArrayList<>();
-
         for (Map.Entry<Long, Integer> entry : productQuantities.entrySet()) {
             Product product = productRepository.findById(entry.getKey())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
             int quantity = entry.getValue();
-
             if (product.getQuantity() < quantity)
                 throw new RuntimeException("Insufficient stock for " + product.getName());
-
             product.setQuantity(product.getQuantity() - quantity);
             productRepository.save(product);
-
             finalItems.add(new CartItem(null, user, product, quantity));
             totalPrice += product.getPrice() * quantity;
         }
@@ -74,6 +87,9 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
         cartItemRepository.deleteAll(cartItems);
+        redisTemplate.delete("CART:" + user.getId());
+        redisTemplate.opsForValue().set("ORDER_PENDING:" + savedOrder.getOrderId(), savedOrder,
+                ORDER_PENDING_TTL_HOURS, TimeUnit.HOURS);
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -83,19 +99,22 @@ public class OrderServiceImpl implements OrderService {
                         .setTaskQueue("E_SHOPPING_TASK_QUEUE")
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
-                WorkflowClient.start(() ->
-                        workflow.processOrder(savedOrder.getOrderId(),
-                                savedOrder.getTotalPrice(),
-                                user.getId().toString()));
+                WorkflowClient.start(() -> workflow.processOrder(savedOrder.getOrderId(),
+                        savedOrder.getTotalPrice(), user.getId().toString()));
             }
         });
 
         return mapToDTO(savedOrder);
     }
 
-    // payment one
+    public OrderResponseDTO createOrderFallback(String token, Throwable t) {
+        t.printStackTrace(); // full exception log
+        throw new RuntimeException("Order service temporarily unavailable. Reason: " + t.getMessage(), t);
+    }
+
     @Override
     @Transactional
+    @CircuitBreaker(name = ORDER_SERVICE_CB, fallbackMethod = "payOrderFallback")
     public OrderResponseDTO payOrder(String token, String orderId) {
         User user = getUserFromToken(token);
         Order order = orderRepository.findByOrderId(orderId)
@@ -121,6 +140,7 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
 
         cartItemRepository.deleteAll(order.getItems());
+        redisTemplate.delete("ORDER_PENDING:" + orderId);
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -130,19 +150,90 @@ public class OrderServiceImpl implements OrderService {
                         .setTaskQueue("E_SHOPPING_TASK_QUEUE")
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
-                WorkflowClient.start(() ->
-                        workflow.processOrder(order.getOrderId(),
-                                order.getTotalPrice(),
-                                user.getId().toString()));
+                WorkflowClient.start(() -> workflow.processOrder(order.getOrderId(),
+                        order.getTotalPrice(), user.getId().toString()));
             }
         });
 
         return mapToDTO(order);
     }
 
-    // single item order
+    public OrderResponseDTO payOrderFallback(String token, String orderId, Throwable t) {
+        t.printStackTrace();
+        throw new RuntimeException("Payment service temporarily unavailable. Reason: " + t.getMessage(), t);
+    }
+
     @Override
     @Transactional
+    public void cancelOrder(String token, String orderId) {
+        User user = getUserFromToken(token);
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!order.getUser().equals(user))
+            throw new RuntimeException("Not your order");
+        if ("DELIVERED".equals(order.getStatus()))
+            throw new RuntimeException("Cannot cancel delivered order");
+
+        order.setStatus("CANCELLED");
+        order.setRefundStatus("PENDING");
+        orderRepository.save(order);
+        redisTemplate.delete("ORDER_PENDING:" + orderId);
+    }
+
+    @Override
+    @Transactional
+    @CircuitBreaker(name = ORDER_SERVICE_CB, fallbackMethod = "returnOrderFallback")
+    public void returnOrder(String token, String orderId) {
+        User user = getUserFromToken(token);
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!order.getUser().equals(user))
+            throw new RuntimeException("Not your order");
+        if (!"DELIVERED".equals(order.getStatus()))
+            throw new RuntimeException("Only delivered orders can be returned");
+
+        order.setStatus("RETURNED");
+        order.setRefundStatus("PENDING");
+        orderRepository.save(order);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                WorkflowClient client = WorkflowClient.newInstance(temporalService.getService());
+                WorkflowOptions options = WorkflowOptions.newBuilder()
+                        .setTaskQueue("E_SHOPPING_TASK_QUEUE")
+                        .build();
+                OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
+                WorkflowClient.start(() -> workflow.scheduleRefund(order.getOrderId(),
+                        user.getId().toString(), 1));
+            }
+        });
+    }
+
+    public void returnOrderFallback(String token, String orderId, Throwable t) {
+        t.printStackTrace();
+        throw new RuntimeException("Return service temporarily unavailable. Reason: " + t.getMessage(), t);
+    }
+
+    @Override
+    public List<OrderResponseDTO> getUserOrders(String token) {
+        User user = getUserFromToken(token);
+        return orderRepository.findByUser(user).stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<OrderResponseDTO> getUserOrdersPaginated(String token, int page, int size, String sortBy) {
+        User user = getUserFromToken(token);
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(sortBy).descending());
+        return orderRepository.findByUser(user, pageable).map(this::mapToDTO);
+    }
+    @Override
+    @Transactional
+    @CircuitBreaker(name = ORDER_SERVICE_CB, fallbackMethod = "orderSingleItemFallback")
     public OrderResponseDTO orderSingleItem(String token, IndividualOrderRequestDTO dto) {
         User user = getUserFromToken(token);
         Product product = productRepository.findById(dto.getProductId())
@@ -177,70 +268,17 @@ public class OrderServiceImpl implements OrderService {
                         .setTaskQueue("E_SHOPPING_TASK_QUEUE")
                         .build();
                 OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
-                WorkflowClient.start(() ->
-                        workflow.processOrder(savedOrder.getOrderId(),
-                                savedOrder.getTotalPrice(),
-                                user.getId().toString()));
+                WorkflowClient.start(() -> workflow.processOrder(savedOrder.getOrderId(),
+                        savedOrder.getTotalPrice(), user.getId().toString()));
             }
         });
 
         return mapToDTO(savedOrder);
     }
 
-    // cancel
-    @Override
-    @Transactional
-    public void cancelOrder(String token, String orderId) {
-        User user = getUserFromToken(token);
-        Order order = orderRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        if (!order.getUser().equals(user))
-            throw new RuntimeException("Not your order");
-        if (order.getStatus().equals("DELIVERED"))
-            throw new RuntimeException("Cannot cancel delivered order");
-
-        order.setStatus("CANCELLED");
-        order.setRefundStatus("PENDING");
-        orderRepository.save(order);
-    }
-
-    @Override
-    @Transactional
-    public void returnOrder(String token, String orderId) {
-        User user = getUserFromToken(token);
-        Order order = orderRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        if (!order.getUser().equals(user))
-            throw new RuntimeException("Not your order");
-        if (!order.getStatus().equals("DELIVERED"))
-            throw new RuntimeException("Only delivered orders can be returned");
-
-        order.setStatus("RETURNED");
-        order.setRefundStatus("PENDING");
-        orderRepository.save(order);
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                WorkflowClient client = WorkflowClient.newInstance(temporalService.getService());
-                WorkflowOptions options = WorkflowOptions.newBuilder()
-                        .setTaskQueue("E_SHOPPING_TASK_QUEUE")
-                        .build();
-                OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
-                WorkflowClient.start(() ->
-                        workflow.scheduleRefund(order.getOrderId(), user.getId().toString(), 1)); // 1-day delay
-            }
-        });
-    }
-
-    @Override
-    public List<OrderResponseDTO> getUserOrders(String token) {
-        User user = getUserFromToken(token);
-        return orderRepository.findByUser(user).stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
+    public OrderResponseDTO orderSingleItemFallback(String token, IndividualOrderRequestDTO dto, Throwable t) {
+        t.printStackTrace();
+        throw new RuntimeException("Order service temporarily unavailable. Reason: " + t.getMessage(), t);
     }
 
     private User getUserFromToken(String token) {
