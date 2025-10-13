@@ -11,12 +11,10 @@ import com.example.E_shopping.Repository.ProductRepository;
 import com.example.E_shopping.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,11 +31,6 @@ public class ProductServiceImpl implements ProductService {
 
     @Autowired
     private CartItemRepository cartItemRepository;
-
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
-
-    private static final long PRODUCT_CACHE_TTL_MINUTES = 60;
 
     @Override
     public ProductResponseDTO addProduct(ProductRequestDTO dto) {
@@ -59,8 +52,6 @@ public class ProductServiceImpl implements ProductService {
         product.setMerchant(merchant);
 
         Product saved = productRepository.save(product);
-
-        redisTemplate.opsForValue().set("PRODUCT:" + saved.getId(), saved, PRODUCT_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         return mapToDTO(saved);
     }
 
@@ -79,9 +70,6 @@ public class ProductServiceImpl implements ProductService {
         else if (dto.getStock() != null) product.setQuantity(dto.getStock());
 
         Product updated = productRepository.save(product);
-
-        // Update cache
-        redisTemplate.opsForValue().set("PRODUCT:" + updated.getId(), updated, PRODUCT_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         return mapToDTO(updated);
     }
 
@@ -94,19 +82,12 @@ public class ProductServiceImpl implements ProductService {
         if (!relatedCartItems.isEmpty()) cartItemRepository.deleteAll(relatedCartItems);
 
         productRepository.delete(product);
-        redisTemplate.delete("PRODUCT:" + id);
     }
 
     @Override
     public ProductResponseDTO getProductById(Long id) {
-        // Redis cache first
-        Product cachedProduct = (Product) redisTemplate.opsForValue().get("PRODUCT:" + id);
-        if (cachedProduct != null) return mapToDTO(cachedProduct);
-
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
-
-        redisTemplate.opsForValue().set("PRODUCT:" + product.getId(), product, PRODUCT_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         return mapToDTO(product);
     }
 

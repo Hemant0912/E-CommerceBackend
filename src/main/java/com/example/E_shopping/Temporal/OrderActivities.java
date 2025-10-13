@@ -8,10 +8,10 @@ import java.time.LocalDateTime;
 public interface OrderActivities {
     boolean processPayment(String orderId, Double amount, String userId);
     void scheduleDelivery(String orderId, String userId);
-    void updateOrderStatusWithTimestamp(Long orderId, String status, LocalDateTime timestamp);
+    void updateOrderStatusWithTimestamp(String orderId, String status, LocalDateTime timestamp);
 
-    void setEstimatedDeliveryDate(Long orderId, LocalDateTime estimatedDate);
+    void setEstimatedDeliveryDate(String orderId, LocalDateTime estimatedDate);
 
-    void processRefund(Long orderId);
+    void processRefund(String orderId);
 }
 

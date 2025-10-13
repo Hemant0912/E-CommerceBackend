@@ -14,17 +14,18 @@ public class OrderWorkflowImpl implements OrderWorkflow {
                 ActivityOptions.newBuilder().setStartToCloseTimeout(Duration.ofMinutes(5)).build()
         );
 
-        Long id = Long.parseLong(orderId);
-
         Workflow.sleep(Duration.ofDays(1));
-        activities.updateOrderStatusWithTimestamp(id, "PREPARING", LocalDateTime.now());
+        activities.updateOrderStatusWithTimestamp(orderId, "PREPARING", LocalDateTime.now());
 
         Workflow.sleep(Duration.ofDays(3));
-        activities.updateOrderStatusWithTimestamp(id, "OUT_FOR_DELIVERY", LocalDateTime.now());
+        activities.updateOrderStatusWithTimestamp(orderId, "OUT_FOR_DELIVERY", LocalDateTime.now());
 
         Workflow.sleep(Duration.ofHours(4));
-        activities.updateOrderStatusWithTimestamp(id, "DELIVERED", LocalDateTime.now());
+        activities.updateOrderStatusWithTimestamp(orderId, "DELIVERED", LocalDateTime.now());
     }
+
+
+
 
     @Override
     public void scheduleRefund(String orderId, String userId, int daysDelay) {
@@ -33,8 +34,6 @@ public class OrderWorkflowImpl implements OrderWorkflow {
                 ActivityOptions.newBuilder().setStartToCloseTimeout(Duration.ofMinutes(5)).build()
         );
 
-        Long id = Long.parseLong(orderId);
-        Workflow.sleep(Duration.ofDays(daysDelay)); // Wait 1 day before refund
-        activities.processRefund(id);
+        activities.processRefund(orderId);
     }
 }

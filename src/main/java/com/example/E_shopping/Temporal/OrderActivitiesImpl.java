@@ -21,8 +21,8 @@ public class OrderActivitiesImpl implements OrderActivities {
     @Override
     public boolean processPayment(String orderId, Double amount, String userId) {
         System.out.println("Processing payment of " + amount + " for order " + orderId);
-        Long id = Long.parseLong(orderId);
-        Order order = orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
 
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
@@ -45,10 +45,9 @@ public class OrderActivitiesImpl implements OrderActivities {
     public void scheduleDelivery(String orderId, String userId) {
         System.out.println("Scheduling delivery for ordre " + orderId + " for user " + userId);
     }
-
     @Override
-    public void updateOrderStatusWithTimestamp(Long orderId, String status, LocalDateTime timestamp) {
-        Order order = orderRepository.findById(orderId)
+    public void updateOrderStatusWithTimestamp(String orderId, String status, LocalDateTime timestamp) {
+        Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         order.setStatus(status);
@@ -64,15 +63,17 @@ public class OrderActivitiesImpl implements OrderActivities {
     }
 
     @Override
-    public void setEstimatedDeliveryDate(Long orderId, LocalDateTime estimatedDate) {
-        Order order = orderRepository.findById(orderId)
+    public void setEstimatedDeliveryDate(String orderId, LocalDateTime estimatedDate) {
+        Order order = orderRepository.findByOrderId(orderId) // use findByOrderId instead of findById
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         order.setEstimatedDeliveryDate(estimatedDate);
         orderRepository.save(order);
     }
+
+
     @Override
-    public void processRefund(Long orderId) {
-        Order order = orderRepository.findById(orderId)
+    public void processRefund(String orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         order.setRefundStatus("COMPLETED");
@@ -81,5 +82,4 @@ public class OrderActivitiesImpl implements OrderActivities {
 
         System.out.println("refund done for: " + order.getOrderId());
     }
-
 }
