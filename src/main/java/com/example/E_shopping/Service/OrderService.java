@@ -7,7 +7,7 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 
 public interface OrderService {
-    OrderResponseDTO createOrder(String token);
+    List<OrderResponseDTO> createOrder(String token);
     OrderResponseDTO payOrder(String token, String orderId);
     void cancelOrder(String token, String orderId);
     void returnOrder(String token, String orderId);

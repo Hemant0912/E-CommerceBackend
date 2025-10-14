@@ -24,9 +24,11 @@ public class OrderController {
 
     // creation of oreder
     @PostMapping("/create")
-    public ResponseEntity<OrderResponseDTO> createOrder(@RequestHeader("X-Auth") String token) {
-        return ResponseEntity.ok(orderService.createOrder(token));
+    public ResponseEntity<List<OrderResponseDTO>> createOrder(@RequestHeader("X-Auth") String token) {
+        List<OrderResponseDTO> responseList = orderService.createOrder(token);
+        return ResponseEntity.ok(responseList);
     }
+
     // pay for order
     @PostMapping("/pay/{orderId}")
     public ResponseEntity<OrderResponseDTO> payOrder(@RequestHeader("X-Auth") String token,

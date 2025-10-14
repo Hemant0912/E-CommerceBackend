@@ -100,12 +100,13 @@ public class CartServiceImpl implements CartService {
 
     @Override
     @Transactional
-    public OrderResponseDTO checkout(String token) {
+    public List<OrderResponseDTO> checkout(String token) {
         User user = getUserFromToken(token);
-        OrderResponseDTO order = orderService.createOrder(token);
+        List<OrderResponseDTO> orders = orderService.createOrder(token);
         redisTemplate.delete("CART:" + user.getId());
-        return order;
+        return orders;
     }
+
 
     private CartItemResponseDTO mapToDTO(CartItem cartItem) {
         CartItemResponseDTO dto = new CartItemResponseDTO();

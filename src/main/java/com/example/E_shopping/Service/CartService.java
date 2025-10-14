@@ -16,7 +16,8 @@ public interface CartService {
 
     CartResponseWithTotalDTO getCartWithTotal(String token);
 
-    OrderResponseDTO checkout(String token);
+    List<OrderResponseDTO> checkout(String token);
+
 
 
 

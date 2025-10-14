@@ -24,9 +24,6 @@ public class OrderWorkflowImpl implements OrderWorkflow {
         activities.updateOrderStatusWithTimestamp(orderId, "DELIVERED", LocalDateTime.now());
     }
 
-
-
-
     @Override
     public void scheduleRefund(String orderId, String userId, int daysDelay) {
         OrderActivities activities = Workflow.newActivityStub(

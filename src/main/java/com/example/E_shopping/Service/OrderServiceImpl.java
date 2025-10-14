@@ -50,62 +50,62 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     @CircuitBreaker(name = ORDER_SERVICE_CB, fallbackMethod = "createOrderFallback")
-    public OrderResponseDTO createOrder(String token) {
+    public List<OrderResponseDTO> createOrder(String token) {
         User user = getUserFromToken(token);
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
         if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
 
-        Map<Long, Integer> productQuantities = new HashMap<>();
+        List<OrderResponseDTO> responseList = new ArrayList<>();
+
         for (CartItem item : cartItems) {
-            productQuantities.merge(item.getProduct().getId(), item.getQuantity(), Integer::sum);
-        }
-
-        double totalPrice = 0;
-        List<CartItem> finalItems = new ArrayList<>();
-        for (Map.Entry<Long, Integer> entry : productQuantities.entrySet()) {
-            Product product = productRepository.findById(entry.getKey())
+            Product product = productRepository.findById(item.getProduct().getId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
-            int quantity = entry.getValue();
-            if (product.getQuantity() < quantity)
+
+            if (product.getQuantity() < item.getQuantity())
                 throw new RuntimeException("Insufficient stock for " + product.getName());
-            product.setQuantity(product.getQuantity() - quantity);
+
+            product.setQuantity(product.getQuantity() - item.getQuantity());
             productRepository.save(product);
-            finalItems.add(new CartItem(null, user, product, quantity));
-            totalPrice += product.getPrice() * quantity;
+
+            Order order = new Order();
+            order.setUser(user);
+            order.setItems(List.of(item));
+            order.setTotalPrice(product.getPrice() * item.getQuantity());
+            order.setOrderId(OrderIdGenerator.generateOrderId());
+            order.setStatus("PAID");
+            order.setPaymentId(OrderIdGenerator.generatePaymentId());
+            order.setOrderDate(LocalDateTime.now());
+            order.setPaidAt(LocalDateTime.now());
+            order.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(4));
+
+            Order savedOrder = orderRepository.save(order);
+            responseList.add(mapToDTO(savedOrder));
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    WorkflowClient client = WorkflowClient.newInstance(temporalService.getService());
+                    WorkflowOptions options = WorkflowOptions.newBuilder()
+                            .setTaskQueue("E_SHOPPING_TASK_QUEUE")
+                            .build();
+                    OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
+                    WorkflowClient.start(() -> workflow.processOrder(savedOrder.getOrderId(),
+                            savedOrder.getTotalPrice(), user.getId().toString()));
+                }
+            });
+
+            redisTemplate.opsForValue().set("ORDER_PENDING:" + order.getOrderId(), order,
+                    ORDER_PENDING_TTL_HOURS, TimeUnit.HOURS);
         }
 
-        Order order = new Order();
-        order.setUser(user);
-        order.setItems(finalItems);
-        order.setTotalPrice(totalPrice);
-        order.setOrderId(OrderIdGenerator.generateOrderId());
-        order.setStatus("PAID");
-        order.setPaymentId(OrderIdGenerator.generatePaymentId());
-        order.setOrderDate(LocalDateTime.now());
-        order.setPaidAt(LocalDateTime.now());
-        order.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(4));
-
-        Order savedOrder = orderRepository.save(order);
+        // clear cart items (DB + Redis)
         cartItemRepository.deleteAll(cartItems);
         redisTemplate.delete("CART:" + user.getId());
-        redisTemplate.opsForValue().set("ORDER_PENDING:" + savedOrder.getOrderId(), savedOrder,
-                ORDER_PENDING_TTL_HOURS, TimeUnit.HOURS);
 
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                WorkflowClient client = WorkflowClient.newInstance(temporalService.getService());
-                WorkflowOptions options = WorkflowOptions.newBuilder()
-                        .setTaskQueue("E_SHOPPING_TASK_QUEUE")
-                        .build();
-                OrderWorkflow workflow = client.newWorkflowStub(OrderWorkflow.class, options);
-                WorkflowClient.start(() -> workflow.processOrder(savedOrder.getOrderId(),
-                        savedOrder.getTotalPrice(), user.getId().toString()));
-            }
-        });
-
-        return mapToDTO(savedOrder);
+        return responseList;
     }
+
+
 
     public OrderResponseDTO createOrderFallback(String token, Throwable t) {
         t.printStackTrace(); // full exception log
