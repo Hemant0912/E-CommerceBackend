@@ -16,7 +16,7 @@ public class AuthController {
 
     // user login
     @PostMapping("/user/login")
-    public ResponseEntity<UserResponseDTO> loginUser(@Valid @RequestBody AuthRequestDTO dto) {
+    public ResponseEntity<ApiResponse<UserResponseDTO>> loginUser(@Valid @RequestBody AuthRequestDTO dto) {
         AuthResponseDTO auth = authService.loginUser(dto);
         UserResponseDTO response = new UserResponseDTO();
         response.setId(String.valueOf(auth.getId()));
@@ -27,9 +27,10 @@ public class AuthController {
         response.setAddress(auth.getAddress());
 
         return ResponseEntity.ok()
-                .header("X-Auth", auth.getToken()) // jwt in x-auth in header
-                .body(response);
+                .header("X-Auth", auth.getToken())
+                .body(new ApiResponse<>("success", "Login successful", response, null));
     }
+
 
     @PostMapping("/user/logout")
     public ResponseEntity<String> logoutUser(@RequestHeader("X-Auth") String token) {

@@ -22,11 +22,12 @@ public class AdminController {
     private AdminService adminService;
 
     @PostMapping("/login")
-    public ResponseEntity<UserResponseDTO> loginAdmin(@RequestBody AuthRequestDTO dto) {
+    public ResponseEntity<ApiResponse<UserResponseDTO>> loginAdmin(@RequestBody AuthRequestDTO dto) {
         AuthResponseDTO auth = authService.loginUser(dto);
 
         if (!"ADMIN".equals(auth.getRole()) && !"SUPER_ADMIN".equals(auth.getRole())) {
-            return ResponseEntity.status(403).body(null);
+            return ResponseEntity.status(403)
+                    .body(new ApiResponse<>( "failure", "Unauthorized role", null, null));
         }
 
         UserResponseDTO response = new UserResponseDTO();
@@ -39,13 +40,13 @@ public class AdminController {
 
         return ResponseEntity.ok()
                 .header("X-Auth", auth.getToken())
-                .body(response);
+                .body(new ApiResponse<>( "success", "Login successful", response, null));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logoutAdmin(@RequestHeader("X-Auth") String token) {
+    public ResponseEntity<ApiResponse<String>> logoutAdmin(@RequestHeader("X-Auth") String token) {
         authService.logoutUser(token);
-        return ResponseEntity.ok("logged out");
+        return ResponseEntity.ok(new ApiResponse<>("success", "Logged out successfully", "logged out", null));
     }
 
     @PostMapping("/create-admin")
@@ -62,9 +63,9 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<List<AdminViewUserDTO>> getAllUsers(@RequestHeader("X-Auth") String token) {
+    public ResponseEntity<ApiResponse<List<AdminViewUserDTO>>> getAllUsers(@RequestHeader("X-Auth") String token) {
         List<AdminViewUserDTO> users = adminService.getAllUsers(token);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(new ApiResponse<>("success", "", users, null));
     }
 
     @GetMapping("/merchants")

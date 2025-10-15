@@ -1,4 +1,5 @@
 package com.example.E_shopping.Controller;
+import com.example.E_shopping.Dto.ApiResponse;
 import com.example.E_shopping.Dto.ProductRequestDTO;
 import com.example.E_shopping.Dto.ProductResponseDTO;
 import com.example.E_shopping.Service.ProductService;
@@ -21,9 +22,11 @@ public class ProductController {
     //  add product
     @PreAuthorize("hasRole('MERCHANT') or hasAuthority('PERMISSION_ADD_PRODUCT')")
     @PostMapping("/add")
-    public ResponseEntity<ProductResponseDTO> addProduct(@RequestBody ProductRequestDTO dto) {
-        return ResponseEntity.ok(productService.addProduct(dto));
+    public ResponseEntity<ApiResponse<ProductResponseDTO>> addProduct(@RequestBody ProductRequestDTO dto) {
+        ProductResponseDTO product = productService.addProduct(dto);
+        return ResponseEntity.ok(new ApiResponse<>("success", "Product added successfully", product, null));
     }
+
 
     //  update product
     @PreAuthorize("hasRole('MERCHANT') or hasAuthority('PERMISSION_UPDATE_PRODUCT')")
@@ -36,9 +39,9 @@ public class ProductController {
     //  delete product
     @PreAuthorize("hasRole('MERCHANT') or hasAuthority('PERMISSION_DELETE_PRODUCT')")
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<String> deleteProduct(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<String>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
-        return ResponseEntity.ok("Product deleted successfully");
+        return ResponseEntity.ok(new ApiResponse<>("success", "Product deleted successfully", "Deleted", null));
     }
 
     //  user can view product by id

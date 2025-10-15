@@ -17,10 +17,11 @@ public class CartController {
 
     // add cart
     @PostMapping("/add")
-    public ResponseEntity<CartItemResponseDTO> addToCart(
+    public ResponseEntity<ApiResponse<CartItemResponseDTO>> addToCart(
             @RequestHeader("X-Auth") String token,
             @RequestBody CartItemRequestDTO dto) {
-        return ResponseEntity.ok(cartService.addToCart(token, dto));
+        CartItemResponseDTO item = cartService.addToCart(token, dto);
+        return ResponseEntity.ok(new ApiResponse<>("success", "Product added to cart", item, null));
     }
 
     // update cart quantity
@@ -34,11 +35,11 @@ public class CartController {
 
     // remove cart item
     @DeleteMapping("/remove/{productId}")
-    public ResponseEntity<String> removeCartItem(
+    public ResponseEntity<ApiResponse<String>> removeCartItem(
             @RequestHeader("X-Auth") String token,
             @PathVariable Long productId) {
         cartService.removeCartItem(token, productId);
-        return ResponseEntity.ok("Product removed from cart");
+        return ResponseEntity.ok(new ApiResponse<>("success", "Product removed from cart", "removed", null));
     }
     // to see all cart item with price
     @GetMapping("/all")

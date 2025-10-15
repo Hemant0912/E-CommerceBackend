@@ -1,5 +1,6 @@
 package com.example.E_shopping.Controller;
 
+import com.example.E_shopping.Dto.ApiResponse;
 import com.example.E_shopping.Dto.UserRequestDTO;
 import com.example.E_shopping.Dto.UserResponseDTO;
 import com.example.E_shopping.Service.AuthService;
@@ -17,8 +18,9 @@ public class PublicController {
 
     // Register user
     @PostMapping("/sign-up")
-    public ResponseEntity<UserResponseDTO> register(@Valid @RequestBody UserRequestDTO dto) {
-        UserResponseDTO response = authService.register(dto);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ApiResponse<UserResponseDTO>> register(@Valid @RequestBody UserRequestDTO dto) {
+        UserResponseDTO user = authService.register(dto);
+        return ResponseEntity.ok(new ApiResponse<>("success", "User registered successfully", user, null));
     }
+
 }

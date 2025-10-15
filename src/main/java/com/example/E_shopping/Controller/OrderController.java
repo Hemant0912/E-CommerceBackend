@@ -1,5 +1,6 @@
 package com.example.E_shopping.Controller;
 
+import com.example.E_shopping.Dto.ApiResponse;
 import com.example.E_shopping.Dto.IndividualOrderRequestDTO;
 import com.example.E_shopping.Dto.OrderResponseDTO;
 import com.example.E_shopping.Service.OrderService;
@@ -24,24 +25,25 @@ public class OrderController {
 
     // creation of oreder
     @PostMapping("/create")
-    public ResponseEntity<List<OrderResponseDTO>> createOrder(@RequestHeader("X-Auth") String token) {
-        List<OrderResponseDTO> responseList = orderService.createOrder(token);
-        return ResponseEntity.ok(responseList);
+    public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> createOrder(@RequestHeader("X-Auth") String token) {
+        List<OrderResponseDTO> orders = orderService.createOrder(token);
+        return ResponseEntity.ok(new ApiResponse<>("success", "Order created successfully", orders, null));
     }
 
-    // pay for order
     @PostMapping("/pay/{orderId}")
-    public ResponseEntity<OrderResponseDTO> payOrder(@RequestHeader("X-Auth") String token,
-                                                     @PathVariable String orderId) {
-        return ResponseEntity.ok(orderService.payOrder(token, orderId));
+    public ResponseEntity<ApiResponse<OrderResponseDTO>> payOrder(@RequestHeader("X-Auth") String token,
+                                                                  @PathVariable String orderId) {
+        OrderResponseDTO order = orderService.payOrder(token, orderId);
+        return ResponseEntity.ok(new ApiResponse<>("success", "Payment successful", order, null));
     }
-    // cancel order
+
     @PostMapping("/cancel/{orderId}")
-    public ResponseEntity<String> cancelOrder(@RequestHeader("X-Auth") String token,
-                                              @PathVariable String orderId) {
+    public ResponseEntity<ApiResponse<String>> cancelOrder(@RequestHeader("X-Auth") String token,
+                                                           @PathVariable String orderId) {
         orderService.cancelOrder(token, orderId);
-        return ResponseEntity.ok("Order cancelled successfully");
+        return ResponseEntity.ok(new ApiResponse<>("success", "Order cancelled successfully", "Cancelled", null));
     }
+
     // return any order
     @PostMapping("/return/{orderId}")
     public ResponseEntity<String> returnOrder(@RequestHeader("X-Auth") String token,

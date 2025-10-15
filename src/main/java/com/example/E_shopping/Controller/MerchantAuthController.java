@@ -24,11 +24,12 @@ public class MerchantAuthController {
 
     // merchant login
     @PostMapping("/login")
-    public ResponseEntity<MerchantResponseDTO> login(@Valid @RequestBody MerchantLoginDTO dto) {
+    public ResponseEntity<ApiResponse<MerchantResponseDTO>> login(@Valid @RequestBody MerchantLoginDTO dto) {
         Merchant merchant = merchantService.getMerchantByEmailOrMobile(dto.getEmailOrMobile());
 
         if (!merchantService.validatePassword(dto.getPassword(), merchant.getPassword())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            return ResponseEntity.status(401)
+                    .body(new ApiResponse<>("failure", "Invalid credentials", null, null));
         }
 
         String token = merchantService.generateAndSaveTokenInRedis(merchant);
@@ -42,13 +43,13 @@ public class MerchantAuthController {
 
         return ResponseEntity.ok()
                 .header("X-Auth", token)
-                .body(response);
+                .body(new ApiResponse<>("success", "Login successful", response, null));
     }
 
-    // merchant logout
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(@RequestHeader("X-Auth") String token) {
+    public ResponseEntity<ApiResponse<String>> logout(@RequestHeader("X-Auth") String token) {
         merchantService.logoutMerchant(token);
-        return ResponseEntity.ok("Logged out");
+        return ResponseEntity.ok(new ApiResponse<>("success", "Logged out successfully", "Logged out", null));
     }
+
 }
